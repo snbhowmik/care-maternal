@@ -1,0 +1,254 @@
+# care_maternal — Stage 1 clinical spec (DRAFT, NOT CLINICALLY APPROVED)
+#
+# Source: IMG_1737.pdf (clinician-authored pathway, 4 pages). Wording follows the PDF.
+# page = PDF page where the item appears.
+#
+# Status values:
+#   from_source       — stated in the PDF; transcribed, awaiting clinician check
+#   proposed          — our addition (alert wording, patient messages); NOT in the PDF
+#   gap               — the PDF does not say; clinician must supply a value
+#
+# Gestational age is in completed weeks + days, e.g. "13+6".
+# Nothing in this file may reach a patient until a clinician signs off (see signoff block).
+
+meta:
+  pathway: pregnancy_to_postpartum
+  version: 0.1-draft
+  source_file: IMG_1737.pdf
+  signoff:
+    clinician_name: null          # gap: name of reviewing clinician
+    date: null
+    status: pending               # pending | approved | rejected
+
+# ---------------------------------------------------------------- 1. Entry and confirmation
+entry:
+  - id: E1
+    page: 1
+    status: from_source
+    text: "Patient enters hospital → Urine pregnancy test (UPT)"
+    branches:
+      positive: E2
+      negative: E3
+  - id: E2
+    page: 1
+    status: from_source
+    text: "Positive UPT → confirm pregnancy and assess symptoms"
+  - id: E3
+    page: 1
+    status: from_source
+    text: "Negative UPT → evaluate whether pregnancy is still suspected"
+
+# ---------------------------------------------------------------- 2. Initial assessment (intake form)
+initial_assessment:
+  page: 1
+  status: from_source
+  fields:
+    - {key: lmp, label: "Last menstrual period (LMP)", type: date}
+    - {key: gestational_age_and_edd, label: "Calculate gestational age and EDD", type: derived, source: lmp}
+    - {key: gravida, label: "Gravida", type: integer}
+    - {key: para, label: "Para", type: integer}
+    - {key: abortions, label: "Abortions", type: integer}
+    - {key: living, label: "Living", type: integer}
+    - {key: prev_miscarriage_or_ectopic, label: "Previous miscarriage / ectopic pregnancy", type: bool}
+    - {key: prev_congenital_anomaly, label: "Previous congenital anomaly", type: bool}
+    - {key: prev_stillbirth_or_preterm, label: "Previous stillbirth / preterm delivery", type: bool}
+    - {key: prev_csection_or_pph, label: "Previous C-section / PPH", type: bool}
+    - {key: medical_history, label: "Medical history: DM, HTN, thyroid, epilepsy, cardiac or renal disease", type: multi_select}
+    - {key: family_and_medication_history, label: "Family history and medication history", type: text}
+
+# ---------------------------------------------------------------- 3. Emergency screen
+emergency_screen:
+  page: 1
+  status: from_source
+  symptoms:
+    - vaginal_bleeding
+    - severe_abdominal_pain
+    - fainting_or_giddiness
+    - severe_vomiting_or_dehydration
+    - breathlessness_or_unstable_vitals
+  on_yes:
+    route: emergency_assessment
+    pdf_text: "Stabilize, urgent USG, investigations and specialist review"
+    alert:
+      status: proposed
+      clinician: "Emergency: {patient} has a positive emergency symptom. Assess now."
+      patient_sms: null           # decided by clinician; see open_questions Q1
+  on_no:
+    route: routine_antenatal_care
+
+# ---------------------------------------------------------------- 4. Obstetric history → risk
+obstetric_history:
+  page: 2
+  status: from_source
+  branches:
+    previous_miscarriage:
+      - "Review number, timing and cause of loss"
+      - "If recurrent pregnancy loss (usually ≥2): APS tests, TSH, HbA1c if indicated, uterine assessment, genetic tests if indicated"
+    previous_congenital_anomaly:
+      - "Review previous reports and diagnosis"
+      - "Genetic counselling and recurrence risk assessment"
+      - "Targeted screening and fetal tests as indicated"
+    no_significant_bad_history: []
+  risk_stratification:
+    high_risk:
+      route: "High-risk obstetrician / fetal medicine specialist review"
+      alert: {status: proposed, clinician: "High-risk pregnancy: {patient} needs specialist review."}
+    low_risk:
+      route: "Routine ANC follow-up"
+  note: "The PDF does not list the criteria for high risk. gap: clinician must define them."
+
+# ---------------------------------------------------------------- 5. Schedule (by gestational age)
+schedule:
+  - window: {from_weeks: "0", to_weeks: "8"}
+    page: 1
+    items:
+      - {id: S-EARLY-US, type: scan, status: from_source,
+         text: "Early ultrasound (as indicated, usually around 6–8 weeks): confirm intrauterine pregnancy, viability, number of fetuses, gestational age"}
+
+  - window: {from_weeks: "0", to_weeks: "13+6"}
+    page: 2
+    label: "First trimester (up to 13+6 weeks): booking"
+    items:
+      - {id: S-BOOK-CBC, type: test, status: from_source, text: "CBC / haemoglobin"}
+      - {id: S-BOOK-GROUP, type: test, status: from_source, text: "Blood group and Rh typing"}
+      - {id: S-BOOK-ABS, type: test, status: from_source, text: "Antibody screen as indicated"}
+      - {id: S-BOOK-URINE, type: test, status: from_source, text: "Urine routine and culture"}
+      - {id: S-BOOK-HIV, type: test, status: from_source, text: "HIV"}
+      - {id: S-BOOK-HBSAG, type: test, status: from_source, text: "HBsAg"}
+      - {id: S-BOOK-SYPH, type: test, status: from_source, text: "Syphilis screening"}
+      - {id: S-BOOK-GLUC, type: test, status: from_source, text: "Blood glucose screening"}
+      - {id: S-BOOK-TSH, type: test, status: from_source, text: "TSH / HbA1c / other tests according to risk and protocol"}
+
+  - window: {from_weeks: "11", to_weeks: "13+6"}
+    page: 3
+    items:
+      - {id: S-NT, type: scan, status: from_source, text: "NT scan (11–13+6 weeks)"}
+      - {id: S-MARKER, type: test, status: from_source, text: "Double marker / NIPT as chosen after counselling"}
+
+  - window: {from_weeks: "0", to_weeks: "13+6"}
+    page: 3
+    items:
+      - {id: S-FT-DATING, type: scan, status: from_source, text: "Dating / viability scan"}
+      - {id: S-SUPP, type: medication, status: from_source, text: "Start antenatal supplements"}
+
+  - window: {from_weeks: "0", to_weeks: "40"}
+    page: 3
+    label: "Td vaccination (India NIS)"
+    items:
+      - {id: V-TD1, type: vaccine, status: from_source,
+         text: "Td-1 as early as possible at first ANC visit"}
+      - {id: V-TD2, type: vaccine, status: from_source,
+         text: "Td-2 four weeks after Td-1"}
+      - {id: V-TDBOOST, type: vaccine, status: from_source,
+         text: "Td booster: one dose if 2 Td doses were received in a previous pregnancy within the last 3 years"}
+      - {id: V-DOSE, type: note, status: from_source,
+         text: "Dose 0.5 mL IM, upper arm"}
+      - {id: V-TD2-DEADLINE, type: alert_rule, status: from_source,
+         text: "Give Td-2 / booster ideally before 36 weeks; if missed, give even after 36 weeks / during labour"}
+
+  - window: {from_weeks: "14", to_weeks: "27"}
+    page: 3
+    label: "Second trimester (14–27 weeks): routine ANC visits"
+    items:
+      - {id: S-ROUTINE-BP, type: visit_check, status: from_source, text: "BP and weight"}
+      - {id: S-ROUTINE-URINE, type: visit_check, status: from_source, text: "Urine protein when indicated"}
+      - {id: S-ROUTINE-ANAEMIA, type: visit_check, status: from_source, text: "Anaemia assessment"}
+      - {id: S-ROUTINE-GROWTH, type: visit_check, status: from_source, text: "Fetal growth and heart rate"}
+
+  - window: {from_weeks: "18", to_weeks: "22"}
+    page: 3
+    items:
+      - {id: S-ANOMALY-SCAN, type: scan, status: from_source, text: "Detailed anomaly scan"}
+      - {id: S-FETAL-ECHO, type: scan, status: from_source, text: "Fetal echocardiography if indicated"}
+      - {id: S-AMNIO, type: procedure, status: from_source, text: "Amniocentesis if indicated (usually from 15 weeks onwards)"}
+
+  - window: {from_weeks: "24", to_weeks: "28"}
+    page: 3
+    items:
+      - {id: S-GDM, type: test, status: from_source, text: "Gestational diabetes screening (75 g OGTT / locally adopted Indian protocol)"}
+      - {id: S-REPEAT-CBC, type: test, status: from_source, text: "Repeat CBC / haemoglobin as indicated"}
+
+  - window: {from_weeks: "28", to_weeks: "32"}
+    page: 3
+    items:
+      - {id: S-28-BP, type: visit_check, status: from_source, text: "BP and urine protein"}
+      - {id: S-28-GROWTH, type: visit_check, status: from_source, text: "Fetal growth assessment"}
+      - {id: S-28-MOVEMENT, type: counselling, status: from_source, text: "Fetal movement counselling"}
+      - {id: S-ANTID, type: medication, status: from_source,
+         text: "Anti-D at around 28 weeks if eligible and unsensitized Rh-negative"}
+      - {id: S-GROWTH-SCAN, type: scan, status: from_source, text: "Growth scan if indicated"}
+
+  - window: {from_weeks: "32", to_weeks: "36"}
+    page: 3
+    items:
+      - {id: S-32-GROWTH, type: visit_check, status: from_source, text: "Assess fetal growth"}
+      - {id: S-32-PRES, type: visit_check, status: from_source, text: "Assess fetal presentation"}
+      - {id: S-32-USG, type: scan, status: from_source, text: "USG / Doppler if indicated"}
+      - {id: S-32-MONITOR, type: visit_check, status: from_source, text: "Monitor BP and fetal movements"}
+      - {id: S-32-PLAN, type: plan, status: from_source, text: "Plan mode and place of delivery"}
+
+  - window: {from_weeks: "36", to_weeks: "40"}
+    page: 4
+    items:
+      - {id: S-36-PRES, type: visit_check, status: from_source, text: "Check fetal presentation"}
+      - {id: S-36-FHR, type: visit_check, status: from_source, text: "Fetal heart rate"}
+      - {id: S-36-BP, type: visit_check, status: from_source, text: "Maternal BP and symptoms"}
+      - {id: S-36-READY, type: visit_check, status: from_source, text: "Assess delivery readiness"}
+      - {id: S-36-LABOUR-SIGNS, type: counselling, status: from_source, text: "Counsel regarding labour signs"}
+
+# ---------------------------------------------------------------- 6. Labour, delivery, newborn, postpartum
+labour_and_delivery:
+  page: 4
+  status: from_source
+  steps:
+    - "Labour pain / delivery"
+    - "Admission to labour room"
+    - "Maternal assessment: BP, pulse, temperature, contractions, vaginal bleeding / membrane status, cervical dilatation and progress, fetal heart rate / CTG as indicated"
+    - "Monitor labour: WHO Labour Care Guide / partograph as appropriate"
+    - "Mode of delivery: vaginal delivery if appropriate, or caesarean section if indicated"
+  note: "The PDF does not define alert thresholds for labour. gap: clinician must supply them before any labour alert is built."
+
+newborn_care:
+  page: 4
+  status: from_source
+  steps:
+    - "Assess breathing and heart rate"
+    - "Keep baby warm"
+    - "Resuscitation if required"
+    - "Delayed cord clamping if appropriate"
+    - "Skin-to-skin contact"
+    - "Early breastfeeding"
+    - "Vitamin K and routine newborn care"
+
+postpartum_care:
+  page: 4
+  status: from_source
+  steps:
+    - "Monitor BP, pulse and bleeding"
+    - "Watch for postpartum haemorrhage"
+    - "Assess uterine contraction"
+    - "Breastfeeding support"
+    - "Postnatal contraception counselling"
+  gap_visit_schedule: "The PDF gives no postnatal visit schedule (only 'Discharge and follow-up'). gap: clinician must define PNC visit timing."
+
+discharge:
+  page: 4
+  status: from_source
+  text: "Discharge and follow-up"
+
+# ---------------------------------------------------------------- 7. Open questions for the clinician
+open_questions:
+  - id: Q1
+    question: "Which emergency symptoms should send an immediate patient SMS, and what should it say?"
+  - id: Q2
+    question: "What are the criteria for high-risk pregnancy?"
+  - id: Q3
+    question: "What are the postnatal (PNC) visit days, and the alert rules for them?"
+  - id: Q4
+    question: "What labour thresholds should trigger an alert?"
+  - id: Q5
+    question: "What is the rule for a missed ANC visit or a missed test? (days late before a reminder or an alert)"
+  - id: Q6
+    question: "Which tests need a result to be entered before the next step, and which are optional?"
+  - id: Q7
+    question: "Is the Td schedule above (India NIS) current for this clinic's protocol?"
