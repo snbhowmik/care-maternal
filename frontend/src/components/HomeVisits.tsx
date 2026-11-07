@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/careui/alert";
+import { Badge } from "@/components/careui/badge";
+import { Button } from "@/components/careui/button";
+import { Textarea } from "@/components/careui/textarea";
 import type { HomeVisit } from "@/types";
 import { errorMessage, request } from "@/utils/api";
 
@@ -29,32 +33,41 @@ export default function HomeVisits({ pregnancyId }: { pregnancyId: string }) {
     }
   }
 
-  if (visits.length === 0) return null;
+  if (visits.length === 0 && !error) return null;
 
   return (
-    <div className="space-y-2 rounded border border-warning-500 bg-warning-100 p-3 text-sm">
-      <p className="font-semibold text-warning-700">Home visits</p>
-      {error && <p className="text-danger-500">{error}</p>}
-      {visits.map((v) => (
-        <div key={v.id} className="space-y-1">
-          <p>{v.reason}</p>
-          <p className="text-secondary-700">Address: {v.address || "not recorded"}</p>
-          <p className="text-secondary-700">
-            Due {v.due_on}{v.assigned_to ? `, assigned to ${v.assigned_to}` : ", no ASHA worker assigned yet"}
-          </p>
-          {v.visited_on ? (
-            <p className="text-primary-800">Visited {v.visited_on}. {v.visit_note}</p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              <input value={note[v.id] ?? ""} onChange={(e) => setNote({ ...note, [v.id]: e.target.value })}
-                placeholder="What was found at the home visit"
-                className="flex-1 rounded border border-secondary-400 bg-white px-2 py-1" />
-              <button type="button" onClick={() => visited(v)}
-                className="rounded bg-primary-700 px-3 py-1 text-white">Record home visit</button>
+    <Alert variant="warning">
+      <AlertTitle>Home visits</AlertTitle>
+      <AlertDescription>
+        <div className="mt-2 flex flex-col gap-3">
+          {error && <p className="text-destructive">{error}</p>}
+          {visits.map((v) => (
+            <div key={v.id} className="flex flex-col gap-2 rounded-md border bg-background p-3 text-foreground">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-medium">{v.reason}</span>
+                {v.visited_on
+                  ? <Badge variant="success">Visited {v.visited_on}</Badge>
+                  : <Badge variant="warning">Due {v.due_on}</Badge>}
+              </div>
+              <p className="text-sm text-muted-foreground">Address: {v.address || "not recorded"}</p>
+              <p className="text-sm text-muted-foreground">
+                {v.assigned_to ? `Assigned to ${v.assigned_to}` : "No ASHA worker assigned yet"}
+              </p>
+              {v.visited_on ? (
+                v.visit_note && <p className="text-sm">{v.visit_note}</p>
+              ) : (
+                <>
+                  <Textarea value={note[v.id] ?? ""} onChange={(e) => setNote({ ...note, [v.id]: e.target.value })}
+                    placeholder="What was found at the home visit" aria-label="What was found at the home visit" />
+                  <div>
+                    <Button type="button" size="sm" onClick={() => visited(v)}>Record home visit</Button>
+                  </div>
+                </>
+              )}
             </div>
-          )}
+          ))}
         </div>
-      ))}
-    </div>
+      </AlertDescription>
+    </Alert>
   );
 }

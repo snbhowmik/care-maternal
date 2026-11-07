@@ -76,8 +76,8 @@ export const EMERGENCY_SYMPTOMS: { value: string; label: string }[] = [
 export interface WorklistRow {
   patient_id: string;
   patient_name: string;
-  pregnancy_id: string;
-  edd: string;
+  pregnancy_id: string | null;
+  edd: string | null;
   open_checks: number;
   overdue_checks: number;
 }

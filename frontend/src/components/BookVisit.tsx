@@ -1,5 +1,10 @@
+import { format, startOfToday } from "date-fns";
 import { useEffect, useState } from "react";
 
+import { Alert, AlertDescription } from "@/components/careui/alert";
+import { Button } from "@/components/careui/button";
+import { Calendar } from "@/components/careui/calendar";
+import { Skeleton } from "@/components/careui/skeleton";
 import type { ScheduleItem } from "@/types";
 import { errorMessage, request } from "@/utils/api";
 
@@ -19,16 +24,16 @@ function clock(iso: string): string {
   return iso.slice(11, 16);
 }
 
-/** Calendar date, then a time from that day's slots. Taken slots cannot be picked. */
+/** Pick a day on the calendar, then a time from that day's slots. Taken slots cannot be picked. */
 export default function BookVisit({ pregnancyId, item, onBook }: Props) {
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [day, setDay] = useState<Date>(startOfToday());
   const [slots, setSlots] = useState<Slot[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
+  const date = format(day, "yyyy-MM-dd");
 
   useEffect(() => {
-    if (!date) return;
     setLoading(true);
     setError("");
     request<Slot[]>(`/pregnancies/${pregnancyId}/slots/?date=${encodeURIComponent(date)}`)
@@ -52,31 +57,45 @@ export default function BookVisit({ pregnancyId, item, onBook }: Props) {
     }
   }
 
+  const free = slots.filter((s) => s.free).length;
+
   return (
-    <div className="w-full space-y-2 rounded border border-secondary-300 bg-secondary-50 p-2">
-      <label className="flex flex-wrap items-center gap-2 text-sm">
-        Date
-        <input type="date" value={date} min={new Date().toISOString().slice(0, 10)}
-          onChange={(e) => setDate(e.target.value)}
-          className="rounded border border-secondary-400 px-2 py-1" />
-      </label>
-
-      {loading && <p className="text-sm text-secondary-600">Loading times…</p>}
-      {error && <p className="text-sm text-danger-500">{error}</p>}
-
-      {!loading && slots.length > 0 && (
-        <div className="grid grid-cols-3 gap-1 sm:grid-cols-6">
-          {slots.map((slot) => (
-            <button key={slot.start} type="button" disabled={!slot.free || busy}
-              onClick={() => pick(slot)}
-              className={`rounded px-2 py-1 text-sm ${slot.free
-                ? "border border-primary-700 text-primary-700 hover:bg-primary-50"
-                : "cursor-not-allowed bg-secondary-200 text-secondary-500 line-through"}`}>
-              {clock(slot.start)}
-            </button>
-          ))}
-        </div>
-      )}
+    <div className="flex w-full flex-col gap-4 rounded-lg border bg-soft-background p-3 md:flex-row">
+      <Calendar
+        selected={day}
+        onSelect={(d: Date | undefined) => d && setDay(d)}
+        disabled={{ before: startOfToday() }}
+        className="rounded-md border bg-background"
+      />
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        <p className="text-sm font-semibold text-foreground">
+          {format(day, "EEEE, d MMMM")}
+          {!loading && slots.length > 0 && (
+            <span className="ml-2 font-normal text-muted-foreground">{free} free</span>
+          )}
+        </p>
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        {loading ? (
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+            {Array.from({ length: 8 }, (_, i) => <Skeleton key={i} className="h-8" />)}
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+            {slots.map((slot) => (
+              <Button key={slot.start} type="button" size="sm" variant={slot.free ? "outline" : "ghost"}
+                disabled={!slot.free || busy} onClick={() => pick(slot)}
+                className={slot.free ? undefined : "line-through"}
+                aria-label={`${clock(slot.start)}${slot.free ? "" : " (taken)"}`}>
+                {clock(slot.start)}
+              </Button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

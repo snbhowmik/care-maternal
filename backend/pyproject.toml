@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "care_maternal"
+version = "0.1.0"
+description = "Pregnancy-to-postpartum care pathway for rural clinics (MVP demo)"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Open Healthcare Network", email = "info@ohc.network" }]
+keywords = ["care_maternal"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+]
+requires-python = ">=3.13"
+dependencies = [
+    "celery",
+    "django",
+    "djangorestframework",
+    "django-environ",
+    "django-filter",
+    "pyyaml",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["care_maternal", "care_maternal.*"]
+
+[tool.setuptools.package-data]
+care_maternal = ["spec/*.yaml", "portal/*.html"]

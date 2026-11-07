@@ -19,6 +19,9 @@ export default defineConfig({
   ],
   build: {
     target: "esnext",
+    // shortcut: keep earlier chunks so a browser holding a cached remoteEntry.js (Cloudflare sets a
+    // 4-hour browser TTL) still loads a working plugin; dist grows, so clear it when the TTL is fixed.
+    emptyOutDir: false,
     minify: false, // shortcut: minify:true breaks @originjs federation 1.4.1 (placeholder unreplaced), revisit when plugin upgraded
     // Remote CSS is not auto-injected by the host; don't depend on packages shipping their own.
     cssCodeSplit: false,
@@ -36,5 +39,8 @@ export default defineConfig({
     strictPort: true,
     cors: true,
     allowedHosts: true,
+    // Every rebuild replaces the chunk files. Without this, browsers and Cloudflare keep an old
+    // remoteEntry.js for hours that points at deleted chunks, and the host hides the plugin.
+    headers: { "Cache-Control": "no-cache" },
   },
 });

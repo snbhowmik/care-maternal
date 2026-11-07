@@ -1,7 +1,8 @@
 include LICENSE
 include README.md
-
+include HISTORY.md
+recursive-include docs *.md
+recursive-include src/care_maternal/spec *.yaml
+recursive-include src/care_maternal/portal *.html
 recursive-exclude * __pycache__
 recursive-exclude * *.py[co]
-recursive-include care_maternal/spec *.yaml
-recursive-include care_maternal/portal *.html

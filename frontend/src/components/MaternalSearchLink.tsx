@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 
+import { Badge } from "@/components/careui/badge";
+import { buttonVariants } from "@/components/careui/button";
 import Page from "@/components/Page";
 import type { WorklistRow } from "@/types";
-import { errorMessage, request } from "@/utils/api";
+import { request } from "@/utils/api";
 
 /** Shown on CARE's patient search page (PatientSearchActions). Structural mirror of the host props. */
 interface SearchActionsProps {
@@ -10,23 +12,21 @@ interface SearchActionsProps {
   className?: string;
 }
 
-function Link({ facilityId }: { facilityId: string }) {
-  const [rows, setRows] = useState<WorklistRow[] | null>(null);
-  const [error, setError] = useState("");
+function MaternalLink({ facilityId }: { facilityId: string }) {
+  const [count, setCount] = useState<number | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     request<WorklistRow[]>(`/pregnancies/worklist/?facility=${encodeURIComponent(facilityId)}`)
-      .then(setRows)
-      .catch((err) => setError(errorMessage(err)));
+      .then((rows) => setCount(rows.length))
+      .catch(() => setFailed(true));
   }, [facilityId]);
 
-  if (error) return null;
-  const count = rows?.length ?? 0;
+  if (failed) return null;
   return (
-    <a href={`/facility/${facilityId}/maternal`}
-      className="inline-flex items-center gap-2 rounded border border-primary-700 px-3 py-2 text-sm font-medium text-primary-700 hover:bg-primary-50">
+    <a href={`/facility/${facilityId}/maternal`} className={buttonVariants({ variant: "secondary", size: "sm" })}>
       Maternal care
-      <span className="rounded bg-primary-100 px-2 py-0.5 text-xs text-primary-800">{rows === null ? "…" : count}</span>
+      <Badge variant="primary">{count ?? "…"}</Badge>
     </a>
   );
 }
@@ -34,7 +34,7 @@ function Link({ facilityId }: { facilityId: string }) {
 export default function MaternalSearchLink({ facilityId }: SearchActionsProps) {
   return (
     <Page>
-      <Link facilityId={facilityId} />
+      <MaternalLink facilityId={facilityId} />
     </Page>
   );
 }

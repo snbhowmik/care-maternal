@@ -102,7 +102,18 @@ class PregnancyViewSet(GenericViewSet):
             if not (_is_registrar(request.user, patient)
                     or AuthorizationController.call("can_view_patient_obj", request.user, patient)):
                 continue
-            for pregnancy in patient.maternal_pregnancies.filter(deleted=False).order_by("-lmp"):
+            pregnancies = patient.maternal_pregnancies.filter(deleted=False).order_by("-lmp")
+            if not pregnancies.exists():
+                # Tagged by hand, not enrolled yet: listed so staff can open the patient and enrol.
+                rows.append({
+                    "patient_id": str(patient.external_id),
+                    "patient_name": patient.name,
+                    "pregnancy_id": None,
+                    "edd": None,
+                    "open_checks": 0,
+                    "overdue_checks": 0,
+                })
+            for pregnancy in pregnancies:
                 open_items = pregnancy.items.filter(deleted=False, done_on__isnull=True)
                 rows.append({
                     "patient_id": str(patient.external_id),

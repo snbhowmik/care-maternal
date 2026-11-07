@@ -60,3 +60,15 @@ class MaternalTagTests(TestCase):
         row = response.json()[0]
         self.assertEqual(row["patient_name"], "SYNTHETIC Tag")
         self.assertGreater(row["open_checks"], 0)
+
+    def test_hand_tagged_patient_without_pregnancy_keeps_tag_and_is_listed(self):
+        tags.tag_patient(self.patient, self.facility)
+        tags.sync_tag(self.patient, self.facility)
+        self.assertTrue(self._has_tag())
+        client = APIClient()
+        client.force_authenticate(self.user)
+        rows = client.get(
+            "/api/care_maternal/pregnancies/worklist/", {"facility": str(self.facility.external_id)}
+        ).json()
+        self.assertEqual(len(rows), 1)
+        self.assertIsNone(rows[0]["pregnancy_id"])

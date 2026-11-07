@@ -1,6 +1,7 @@
 from django.core.management.base import BaseCommand
 
 from care.emr.models import Organization
+from care_maternal.access import grant_all_staff
 from care.emr.resources.organization.spec import OrganizationTypeChoices
 
 # The 28 states and 8 union territories of India (2026).
@@ -31,3 +32,5 @@ class Command(BaseCommand):
             )
             created += was_created
         self.stdout.write(f"States and UTs: {len(STATES_AND_UTS)} listed, {created} added.")
+        # Staff see patients through their role on each state, so new states need the same roles.
+        self.stdout.write(f"Staff region roles added: {grant_all_staff()}")

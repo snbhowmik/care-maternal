@@ -1,6 +1,11 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 
+import { Alert, AlertDescription } from "@/components/careui/alert";
+import { Button } from "@/components/careui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/careui/card";
+import { Field, FieldGroup, FieldLabel } from "@/components/careui/field";
+import { Input } from "@/components/careui/input";
 import type { Pregnancy } from "@/types";
 import { currentFacilityId, errorMessage, request } from "@/utils/api";
 
@@ -9,12 +14,18 @@ interface Props {
   onCreated: (p: Pregnancy) => void;
 }
 
+const COUNTS = [
+  ["gravida", "Gravida"],
+  ["para", "Para"],
+  ["abortions", "Abortions"],
+  ["living", "Living"],
+] as const;
+
+type Counts = Record<(typeof COUNTS)[number][0], number>;
+
 export default function CreatePregnancy({ patientId, onCreated }: Props) {
   const [lmp, setLmp] = useState("");
-  const [gravida, setGravida] = useState(1);
-  const [para, setPara] = useState(0);
-  const [abortions, setAbortions] = useState(0);
-  const [living, setLiving] = useState(0);
+  const [counts, setCounts] = useState<Counts>({ gravida: 1, para: 0, abortions: 0, living: 0 });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -27,10 +38,7 @@ export default function CreatePregnancy({ patientId, onCreated }: Props) {
         patient: patientId,
         facility: currentFacilityId(),
         lmp,
-        gravida,
-        para,
-        abortions,
-        living,
+        ...counts,
       });
       onCreated(created);
       setLmp("");
@@ -41,37 +49,43 @@ export default function CreatePregnancy({ patientId, onCreated }: Props) {
     }
   }
 
-  const num = (set: (n: number) => void) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    set(Number(e.target.value));
-
   return (
-    <form onSubmit={submit} className="rounded-lg border border-secondary-400 bg-white p-4 space-y-3">
-      <h3 className="font-bold text-secondary-900">New pregnancy</h3>
-      <label className="block text-sm text-secondary-700">
-        Last menstrual period (LMP)
-        <input type="date" required value={lmp} onChange={(e) => setLmp(e.target.value)}
-          className="mt-1 w-full rounded border border-secondary-400 px-2 py-1" />
-      </label>
-      <div className="grid grid-cols-2 gap-2">
-        {[
-          ["Gravida", gravida, setGravida],
-          ["Para", para, setPara],
-          ["Abortions", abortions, setAbortions],
-          ["Living", living, setLiving],
-        ].map(([label, value, set]) => (
-          <label key={label as string} className="block text-sm text-secondary-700">
-            {label as string}
-            <input type="number" min={0} value={value as number}
-              onChange={num(set as (n: number) => void)}
-              className="mt-1 w-full rounded border border-secondary-400 px-2 py-1" />
-          </label>
-        ))}
-      </div>
-      {error && <p className="text-sm text-danger-500">{error}</p>}
-      <button type="submit" disabled={busy || !lmp}
-        className="rounded bg-primary-700 px-3 py-2 text-white disabled:opacity-50">
-        {busy ? "Saving…" : "Create pregnancy"}
-      </button>
-    </form>
+    <Card>
+      <CardHeader>
+        <CardTitle>New pregnancy</CardTitle>
+        <CardDescription>The schedule of checks starts from the last menstrual period.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={submit}>
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="maternal-lmp">Last menstrual period (LMP)</FieldLabel>
+              <Input id="maternal-lmp" type="date" required value={lmp}
+                max={new Date().toISOString().slice(0, 10)}
+                onChange={(e) => setLmp(e.target.value)} />
+            </Field>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+              {COUNTS.map(([key, label]) => (
+                <Field key={key}>
+                  <FieldLabel htmlFor={`maternal-${key}`}>{label}</FieldLabel>
+                  <Input id={`maternal-${key}`} type="number" min={0} value={counts[key]}
+                    onChange={(e) => setCounts({ ...counts, [key]: Number(e.target.value) })} />
+                </Field>
+              ))}
+            </div>
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            <div>
+              <Button type="submit" disabled={busy || !lmp}>
+                {busy ? "Saving…" : "Create pregnancy"}
+              </Button>
+            </div>
+          </FieldGroup>
+        </form>
+      </CardContent>
+    </Card>
   );
 }

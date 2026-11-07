@@ -56,10 +56,14 @@ def untag_patient(patient, facility) -> None:
 
 
 def sync_tag(patient, facility) -> None:
-    """Keep the tag exactly while the patient has an open check."""
+    """Keep the tag while the patient has an open check; remove it after the last one.
+
+    A patient tagged by hand who has no pregnancy yet keeps the tag: that is how staff mark
+    a patient for maternal care before enrolment.
+    """
     if _has_open_checks(patient):
         tag_patient(patient, facility)
-    else:
+    elif MaternalPregnancy.objects.filter(patient=patient, deleted=False).exists():
         untag_patient(patient, facility)
 
 
