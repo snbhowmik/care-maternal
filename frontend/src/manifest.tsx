@@ -1,6 +1,7 @@
 import { lazy } from "react";
 
 import Page from "./components/Page";
+import CheckListPage from "./pages/CheckListPage";
 import InboxPage from "./pages/InboxPage";
 import MaternalPage from "./pages/MaternalPage";
 
@@ -30,6 +31,11 @@ const manifest: Manifest = {
         <MaternalPage />
       </Page>
     ),
+    "/facility/:facilityId/maternal-checks": () => (
+      <Page>
+        <CheckListPage />
+      </Page>
+    ),
     "/facility/:facilityId/maternal-inbox": () => (
       <Page>
         <InboxPage />
@@ -45,6 +51,7 @@ const manifest: Manifest = {
   extends: [],
   navItems: [
     { url: "maternal", name: "Maternal care" },
+    { url: "maternal-checks", name: "Maternal check list" },
     { url: "maternal-inbox", name: "Referrals received" },
   ],
 };

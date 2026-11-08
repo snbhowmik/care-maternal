@@ -71,9 +71,60 @@ def build_items(lmp: date, spec: dict | None = None) -> list[dict]:
     return items
 
 
-def item_state(due_from: date | None, due_to: date | None, done_on, today: date) -> str:
+def items_from_templates(lmp: date, templates: list[dict]) -> list[dict]:
+    """One dict per check template, with its due window computed from the LMP.
+
+    A template with relative_to has no dates yet: it becomes due after another check is recorded.
+    """
+    items = []
+    for t in templates:
+        relative = bool(t.get("relative_to")) or not t.get("from_weeks")
+        items.append(
+            {
+                "spec_id": t["spec_id"],
+                "kind": t["kind"],
+                "label": t["label"],
+                "due_from": None if relative else ga_date(lmp, t["from_weeks"]),
+                "due_to": None if relative else ga_date(lmp, t["to_weeks"]),
+                "waiting_on": (t.get("waiting_note") or f"after {t['relative_to']} is recorded")
+                if t.get("relative_to") else (t.get("waiting_note") or ("clinician sets the date" if relative else "")),
+            }
+        )
+    return items
+
+
+def templates_from_spec(spec: dict | None = None) -> list[dict]:
+    """The clinician spec as check templates. Used once, to seed a hospital's check list."""
+    spec = spec or load_spec()
+    rows = []
+    for block in spec["schedule"]:
+        window = block["window"]
+        for item in block["items"]:
+            row = {
+                "spec_id": item["id"],
+                "label": item["text"],
+                "kind": item["type"],
+                "from_weeks": str(window["from_weeks"]),
+                "to_weeks": str(window["to_weeks"]),
+                "relative_to": "",
+                "after_days": None,
+                "waiting_note": "",
+            }
+            if item["id"] == "V-TD2":
+                row.update(relative_to="V-TD1", after_days=28, waiting_note=RELATIVE_ITEMS["V-TD2"])
+            elif item["id"] == "V-TDBOOST":
+                row.update(from_weeks="", to_weeks="", waiting_note=RELATIVE_ITEMS["V-TDBOOST"])
+            rows.append(row)
+    return rows
+
+
+def item_state(due_from: date | None, due_to: date | None, done_on, today: date, resolution: str = "") -> str:
     if done_on:
         return "done"
+    if resolution == "elsewhere":
+        return "elsewhere"
+    if resolution == "not_needed":
+        return "waived"
     if due_from is None:
         return "waiting"
     if today < due_from:

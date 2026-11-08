@@ -29,7 +29,7 @@ def ensure_tag(facility) -> TagConfig:
 
 def _has_open_checks(patient) -> bool:
     return MaternalPregnancy.objects.filter(
-        patient=patient, deleted=False, items__done_on__isnull=True, items__deleted=False
+        patient=patient, deleted=False, items__done_on__isnull=True, items__resolution="", items__deleted=False
     ).exists()
 
 

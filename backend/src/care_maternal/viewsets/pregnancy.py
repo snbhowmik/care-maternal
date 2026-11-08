@@ -4,7 +4,7 @@ from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
@@ -42,6 +42,16 @@ def _facility_from(external_id):
     if not external_id:
         return None
     return get_object_or_404(Facility, external_id=external_id)
+
+
+def _optional_date(raw):
+    """An ISO date from the request, or None when it was left empty."""
+    if not raw:
+        return None
+    try:
+        return date.fromisoformat(str(raw))
+    except ValueError:
+        raise ValidationError({"date": "Use the format YYYY-MM-DD."}) from None
 
 
 def _is_registrar(user, patient):
@@ -114,7 +124,7 @@ class PregnancyViewSet(GenericViewSet):
                     "overdue_checks": 0,
                 })
             for pregnancy in pregnancies:
-                open_items = pregnancy.items.filter(deleted=False, done_on__isnull=True)
+                open_items = pregnancy.items.filter(deleted=False, done_on__isnull=True, resolution="")
                 rows.append({
                     "patient_id": str(patient.external_id),
                     "patient_name": patient.name,
@@ -197,6 +207,54 @@ class PregnancyViewSet(GenericViewSet):
         item = get_object_or_404(pregnancy.items, spec_id=spec_id, deleted=False)
         no_show_service.mark_no_show(item, actor=request.user)
         return Response(ScheduleItemSerializer(item).data)
+
+    def _closed_response(self, request, pregnancy, item):
+        """After a check is closed or reopened: keep the Maternal tag in step with the open checks."""
+        facility = _facility_from(request.data.get("facility"))
+        if facility:
+            tags.sync_tag(pregnancy.patient, facility)
+        return Response(ScheduleItemSerializer(item).data)
+
+    @action(detail=True, methods=["post"], url_path=r"items/(?P<spec_id>[^/]+)/resolve")
+    def resolve(self, request, external_id=None, spec_id=None):
+        """Done elsewhere, or not needed for this patient. The doctor's decision, with a note."""
+        pregnancy = self._pregnancy(request, external_id)
+        _writable_patient(request, pregnancy.patient)
+        item = get_object_or_404(pregnancy.items, spec_id=spec_id, deleted=False)
+        services.resolve_item(
+            item,
+            request.data.get("resolution", ""),
+            request.data.get("note", ""),
+            _optional_date(request.data.get("on_date")),
+            request.user,
+        )
+        return self._closed_response(request, pregnancy, item)
+
+    @action(detail=True, methods=["post"], url_path=r"items/(?P<spec_id>[^/]+)/reopen")
+    def reopen(self, request, external_id=None, spec_id=None):
+        pregnancy = self._pregnancy(request, external_id)
+        _writable_patient(request, pregnancy.patient)
+        item = get_object_or_404(pregnancy.items, spec_id=spec_id, deleted=False)
+        services.reopen_item(item)
+        return self._closed_response(request, pregnancy, item)
+
+    @action(detail=True, methods=["post"], url_path="add-check")
+    def add_check(self, request, external_id=None):
+        """A check for this patient only."""
+        pregnancy = self._pregnancy(request, external_id)
+        _writable_patient(request, pregnancy.patient)
+        item = services.add_custom_item(
+            pregnancy,
+            request.data.get("label", ""),
+            request.data.get("kind", ""),
+            _optional_date(request.data.get("due_from")),
+            _optional_date(request.data.get("due_to")),
+            request.user,
+        )
+        facility = _facility_from(request.data.get("facility"))
+        if facility:
+            tags.sync_tag(pregnancy.patient, facility)
+        return Response(ScheduleItemSerializer(item).data, status=201)
 
     @action(detail=True, methods=["get"], url_path="home-visits")
     def home_visits(self, request, external_id=None):

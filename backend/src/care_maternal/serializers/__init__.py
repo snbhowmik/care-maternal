@@ -42,6 +42,7 @@ class ScheduleItemSerializer(serializers.ModelSerializer):
         fields = [
             "id", "spec_id", "kind", "label", "due_from", "due_to", "waiting_on",
             "done_on", "state", "appointment_id", "appointment_at",
+            "resolution", "resolution_note", "resolved_on",
         ]
         read_only_fields = fields
 
@@ -55,7 +56,7 @@ class ScheduleItemSerializer(serializers.ModelSerializer):
         return obj.booking.token_slot.start_datetime.isoformat() if obj.booking_id else None
 
     def get_state(self, obj) -> str:
-        return item_state(obj.due_from, obj.due_to, obj.done_on, date.today())
+        return item_state(obj.due_from, obj.due_to, obj.done_on, date.today(), obj.resolution)
 
 
 class BookVisitSerializer(serializers.Serializer):

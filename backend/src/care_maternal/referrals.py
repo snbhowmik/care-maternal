@@ -86,6 +86,11 @@ def build_summary(pregnancy: MaternalPregnancy) -> dict:
                 "due_from": str(i.due_from) if i.due_from else None,
                 "due_to": str(i.due_to) if i.due_to else None,
                 "done_on": str(i.done_on) if i.done_on else None,
+                "resolution": i.resolution,
+                "resolution_note": i.resolution_note,
+                "resolved_on": str(i.resolved_on) if i.resolved_on else None,
+                "custom": i.spec_id.startswith("CUSTOM-"),
+                "kind": i.kind,
             }
             for i in pregnancy.items.filter(deleted=False).order_by("due_from", "spec_id")
         ],
@@ -101,6 +106,12 @@ def create_referral(pregnancy, peer_name, reason, user) -> MaternalReferral:
     _peer(peer_name)
     if not reason or not reason.strip():
         raise ValidationError("Write why the patient is being referred.")
+    if MaternalReferral.objects.filter(
+        pregnancy=pregnancy, direction="out", peer=peer_name, reason=reason.strip(),
+        status="draft", deleted=False,
+    ).exists():
+        # A repeated click or retry must not pile up identical referrals.
+        raise ValidationError("This referral already exists and is waiting for consent. Record consent on it.")
     ref = MaternalReferral.objects.create(
         external_ref=uuid.uuid4(),
         direction="out",
@@ -278,8 +289,23 @@ def receive_referral(payload: dict) -> MaternalReferral:
         living=pg.get("living", 0),
     )
     for item in summary.get("schedule", []):
+        mine = pregnancy.items.filter(spec_id=item["spec_id"])
+        if not mine.exists() and item.get("custom"):
+            # A check the referring hospital added for this patient: keep it, so nothing is lost.
+            services.add_custom_item(
+                pregnancy, item["label"], item.get("kind", ""),
+                date.fromisoformat(item["due_from"]) if item.get("due_from") else None,
+                date.fromisoformat(item["due_to"]) if item.get("due_to") else None, None,
+            )
+            mine = pregnancy.items.filter(label=item["label"], spec_id__startswith="CUSTOM-")
         if item.get("done_on"):
-            pregnancy.items.filter(spec_id=item["spec_id"]).update(done_on=date.fromisoformat(item["done_on"]))
+            mine.update(done_on=date.fromisoformat(item["done_on"]))
+        elif item.get("resolution") in ("elsewhere", "not_needed"):
+            mine.update(
+                resolution=item["resolution"],
+                resolution_note=item.get("resolution_note", ""),
+                resolved_on=date.fromisoformat(item["resolved_on"]) if item.get("resolved_on") else None,
+            )
     ref = MaternalReferral.objects.create(
         external_ref=ext,
         direction="in",

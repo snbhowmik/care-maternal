@@ -79,23 +79,27 @@ function Panel({ patient }: PatientHomeProps) {
         )}
 
         {pregnancies?.map((p) => {
-          const items = history[p.id] ?? [];
+          const items = (history[p.id] ?? []).filter((i) => i.state !== "waived");
+          const notNeeded = (history[p.id] ?? []).length - items.length;
           const done = items
-            .filter((i) => i.done_on)
-            .sort((a, b) => (b.done_on ?? "").localeCompare(a.done_on ?? ""));
+            .filter((i) => i.done_on || i.state === "elsewhere")
+            .sort((a, b) => (b.done_on ?? b.resolved_on ?? "").localeCompare(a.done_on ?? a.resolved_on ?? ""));
           return (
             <div key={p.id} className="flex flex-col gap-4">
               <section className="flex flex-col gap-2" aria-label="Checks made">
                 <h4 className="flex items-center gap-2 text-sm font-semibold text-foreground">
                   Checks made
                   <Badge variant={done.length ? "success" : "neutral"}>{done.length} of {items.length}</Badge>
+                  {notNeeded > 0 && <span className="text-xs font-normal text-muted-foreground">{notNeeded} marked not needed</span>}
                 </h4>
                 {done.length > 0 && (
                   <ul className="flex flex-col divide-y rounded-lg border text-sm">
                     {done.map((i) => (
                       <li key={i.id} className="flex flex-wrap justify-between gap-2 px-3 py-2">
                         <span className="text-foreground">{i.label}</span>
-                        <span className="text-muted-foreground">{i.done_on}</span>
+                        <span className="text-muted-foreground">
+                          {i.done_on ?? `Elsewhere${i.resolved_on ? `, ${i.resolved_on}` : ""}${i.resolution_note ? `: ${i.resolution_note}` : ""}`}
+                        </span>
                       </li>
                     ))}
                   </ul>

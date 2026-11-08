@@ -22,7 +22,7 @@ function apiBase(): string {
 
 export async function request<T>(
   path: string,
-  method: "GET" | "POST" = "GET",
+  method: "GET" | "POST" | "PATCH" = "GET",
   body?: unknown,
 ): Promise<T> {
   const token = localStorage.getItem(STAFF_TOKEN_KEY);

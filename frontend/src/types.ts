@@ -1,4 +1,5 @@
-export type ItemState = "done" | "waiting" | "upcoming" | "due" | "overdue";
+export type ItemState = "done" | "elsewhere" | "waived" | "waiting" | "upcoming" | "due" | "overdue";
+export type Resolution = "" | "elsewhere" | "not_needed";
 
 export interface Pregnancy {
   id: string;
@@ -26,6 +27,9 @@ export interface ScheduleItem {
   state: ItemState;
   appointment_id: string | null;
   appointment_at: string | null;
+  resolution: Resolution;
+  resolution_note: string;
+  resolved_on: string | null;
 }
 
 export interface ReferralEvent {
@@ -91,3 +95,31 @@ export interface HomeVisit {
   visited_on: string | null;
   visit_note: string;
 }
+
+export interface CheckTemplate {
+  id: string;
+  spec_id: string;
+  label: string;
+  kind: string;
+  from_weeks: string;
+  to_weeks: string;
+  relative_to: string;
+  after_days: number | null;
+  waiting_note: string;
+  active: boolean;
+  sort_order: number;
+  source: "spec" | "custom";
+}
+
+export const CHECK_KINDS: { value: string; label: string }[] = [
+  { value: "visit_check", label: "Visit" },
+  { value: "test", label: "Test" },
+  { value: "scan", label: "Scan" },
+  { value: "vaccine", label: "Vaccine" },
+  { value: "medication", label: "Medicine" },
+  { value: "counselling", label: "Counselling" },
+  { value: "other", label: "Other" },
+];
+
+export const kindLabel = (kind: string): string =>
+  CHECK_KINDS.find((k) => k.value === kind)?.label ?? kind.replace(/_/g, " ");

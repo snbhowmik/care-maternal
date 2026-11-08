@@ -42,6 +42,17 @@ class MaternalScheduleItem(EMRBaseModel):
     overdue_alerted = models.BooleanField(default=False)
     # Appointments where the patient did not come. Counts every no-show for this check.
     no_show_count = models.PositiveSmallIntegerField(default=0)
+    # Closed without being done here: the patient had it elsewhere, or the doctor decided it is
+    # not needed for this patient. Empty while the check is open. done_on stays empty in both cases.
+    resolution = models.CharField(
+        max_length=16, blank=True, default="",
+        choices=[("", "Open"), ("elsewhere", "Done elsewhere"), ("not_needed", "Not needed")],
+    )
+    resolution_note = models.TextField(blank=True, default="")
+    resolved_on = models.DateField(null=True, blank=True)  # when it was done elsewhere, if known
+    resolved_by = models.ForeignKey(
+        "users.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
     # CARE appointment created for this visit (core TokenBooking). Null until booked.
     booking = models.ForeignKey(
         "emr.TokenBooking", on_delete=models.SET_NULL, null=True, blank=True,
@@ -151,3 +162,33 @@ class MaternalHomeVisit(EMRBaseModel):
     )
     visited_on = models.DateField(null=True, blank=True)
     visit_note = models.TextField(blank=True, default="")
+
+
+class MaternalCheckTemplate(EMRBaseModel):
+    """One check that is created for every new pregnancy.
+
+    Seeded from the clinician spec the first time it is needed. Clinicians then add, change and
+    retire checks themselves. Changes apply to pregnancies enrolled afterwards; existing pregnancies
+    keep the checks they already have. A check is never deleted, only retired, so history stays intact.
+    """
+
+    spec_id = models.CharField(max_length=64)
+    label = models.TextField()
+    kind = models.CharField(max_length=32, default="visit_check")
+    # Gestational age as completed weeks, or weeks+days, e.g. "13+6". Empty means no schedule:
+    # the clinician sets the date for each patient.
+    from_weeks = models.CharField(max_length=8, blank=True, default="0")
+    to_weeks = models.CharField(max_length=8, blank=True, default="40")
+    # When set, the check is due this many days after another check is recorded, not from the LMP.
+    relative_to = models.CharField(max_length=64, blank=True, default="")
+    after_days = models.PositiveSmallIntegerField(null=True, blank=True)
+    # Shown while the date is unknown, e.g. "clinician decision".
+    waiting_note = models.CharField(max_length=255, blank=True, default="")
+    active = models.BooleanField(default=True)
+    sort_order = models.PositiveIntegerField(default=0)
+    source = models.CharField(max_length=8, default="spec", choices=[("spec", "Spec"), ("custom", "Custom")])
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["spec_id"], condition=models.Q(deleted=False), name="unique_maternal_check_spec_id")
+        ]

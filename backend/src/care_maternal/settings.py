@@ -98,6 +98,10 @@ DEFAULTS = {
     "MATERNAL_INBOUND_TOKEN": "",  # shared secret other hospitals send with their requests
     "MATERNAL_HANDOVER_HOURS": 24,
     "MATERNAL_DEMO_SMS_ENABLED": True,  # False on any publicly reachable instance
+    # Eka Care scribe. The secret stays on the server; staff browsers get short-lived tokens only.
+    "MATERNAL_EKA_CLIENT_ID": "",
+    "MATERNAL_EKA_CLIENT_SECRET": "",
+    "MATERNAL_EKA_API_BASE": "https://api.eka.care",
 }
 
 plugin_settings = PluginSettings(

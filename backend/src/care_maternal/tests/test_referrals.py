@@ -74,6 +74,15 @@ class HandoverTests(TestCase):
     def _referral(self):
         return svc.create_referral(self.pregnancy, RECEIVER, "Severe anaemia, needs transfusion", self.user)
 
+    def test_an_identical_draft_referral_is_refused(self):
+        self._referral()
+        with self.assertRaises(ValidationError):
+            self._referral()
+        self.assertEqual(MaternalReferral.objects.filter(direction="out").count(), 1)
+        # A different reason is a different referral.
+        svc.create_referral(self.pregnancy, RECEIVER, "Reduced fetal movements", self.user)
+        self.assertEqual(MaternalReferral.objects.filter(direction="out").count(), 2)
+
     def test_consent_is_required_before_send(self):
         ref = self._referral()
         with mock.patch.object(svc, "_post", side_effect=_route):

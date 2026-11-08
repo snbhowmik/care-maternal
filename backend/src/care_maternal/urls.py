@@ -10,8 +10,10 @@ Keep them read-mostly. See the care-auth-contexts skill.
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
+from care_maternal.viewsets.check_templates import CheckTemplateViewSet
 from care_maternal.viewsets.config import ConfigView
 from care_maternal.viewsets.demo_sms import DemoSmsView
+from care_maternal.viewsets.eka import EkaTokenView
 from care_maternal.viewsets.otp_pregnancy import OTPPregnancyViewSet
 from care_maternal.viewsets.portal import portal
 from care_maternal.viewsets.pregnancy import PregnancyViewSet
@@ -26,6 +28,7 @@ router = DefaultRouter()
 router.register("pregnancies", PregnancyViewSet, basename="maternal-pregnancy")
 router.register("otp/pregnancies", OTPPregnancyViewSet, basename="otp-maternal-pregnancy")
 router.register("referrals", ReferralViewSet, basename="maternal-referral")
+router.register("check-templates", CheckTemplateViewSet, basename="maternal-check-template")
 router.register("otp/referrals", OTPReferralViewSet, basename="otp-maternal-referral")
 
 urlpatterns = [
@@ -33,6 +36,7 @@ urlpatterns = [
     path("referrals/status/", InboundStatusView.as_view(), name="care_maternal-referral-status"),
     *router.urls,
     path("config/", ConfigView.as_view(), name="care_maternal-config"),
+    path("eka/token/", EkaTokenView.as_view(), name="care_maternal-eka-token"),
     path("otp/demo-sms/", DemoSmsView.as_view(), name="care_maternal-demo-sms"),
     path("portal/", portal, name="care_maternal-portal"),
 ]

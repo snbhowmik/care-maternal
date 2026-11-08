@@ -15,20 +15,26 @@ import { Checkbox } from "@/components/careui/checkbox";
 import { Input } from "@/components/careui/input";
 import { Label } from "@/components/careui/label";
 import { Separator } from "@/components/careui/separator";
-import { EMERGENCY_SYMPTOMS } from "@/types";
-import type { Alert, ItemState, Pregnancy, ScheduleItem } from "@/types";
+import { EMERGENCY_SYMPTOMS, kindLabel } from "@/types";
+import type { Alert, ItemState, Pregnancy, Resolution, ScheduleItem } from "@/types";
 import { currentFacilityId, errorMessage, request } from "@/utils/api";
 
+import AddCheck from "./AddCheck";
+import type { NewCheck } from "./AddCheck";
 import BookVisit from "./BookVisit";
+import CloseCheck from "./CloseCheck";
 import Referrals from "./Referrals";
+import ReviewEarlier from "./ReviewEarlier";
 
-const ORDER: ItemState[] = ["overdue", "due", "upcoming", "waiting", "done"];
+const ORDER: ItemState[] = ["overdue", "due", "upcoming", "waiting", "done", "elsewhere", "waived"];
 const STATE_LABEL: Record<ItemState, string> = {
   overdue: "Overdue",
   due: "Due",
   upcoming: "Upcoming",
   waiting: "Waiting",
   done: "Done",
+  elsewhere: "Done elsewhere",
+  waived: "Not needed",
 };
 const STATE_BADGE = {
   overdue: "destructive",
@@ -36,6 +42,8 @@ const STATE_BADGE = {
   upcoming: "info",
   waiting: "neutral",
   done: "success",
+  elsewhere: "success",
+  waived: "neutral",
 } as const;
 
 interface Props {
@@ -48,6 +56,7 @@ export default function PregnancyCard({ pregnancy }: Props) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [symptoms, setSymptoms] = useState<string[]>([]);
+  const [allAlerts, setAllAlerts] = useState(false);
 
   const reload = useCallback(async () => {
     try {
@@ -106,6 +115,44 @@ export default function PregnancyCard({ pregnancy }: Props) {
       return `Marked no-show: ${item.label}. The visit is due again.`;
     });
 
+  const resolveMany = (targets: ScheduleItem[], resolution: Exclude<Resolution, "">, note: string, onDate = "") =>
+    act(async () => {
+      for (const item of targets) {
+        await request(`/pregnancies/${pregnancy.id}/items/${item.spec_id}/resolve/`, "POST", {
+          resolution,
+          note,
+          on_date: onDate || null,
+          facility: currentFacilityId(),
+        });
+      }
+      const what = resolution === "elsewhere" ? "done elsewhere" : "not needed";
+      return targets.length === 1
+        ? `Marked ${what}: ${targets[0].label}`
+        : `${targets.length} checks marked ${what}.`;
+    });
+
+  const reopen = (item: ScheduleItem) =>
+    act(async () => {
+      await request(`/pregnancies/${pregnancy.id}/items/${item.spec_id}/reopen/`, "POST", { facility: currentFacilityId() });
+      return `Reopened: ${item.label}`;
+    });
+
+  const addCheck = async (check: NewCheck) => {
+    let added = false;
+    await act(async () => {
+      await request(`/pregnancies/${pregnancy.id}/add-check/`, "POST", {
+        label: check.label,
+        kind: check.kind,
+        due_from: check.due_from || null,
+        due_to: check.due_to || null,
+        facility: currentFacilityId(),
+      });
+      added = true;
+      return `Added for this patient: ${check.label}`;
+    });
+    return added;
+  };
+
   const bookVisit = (item: ScheduleItem, date: string, time: string) =>
     act(async () => {
       await request(`/pregnancies/${pregnancy.id}/items/${item.spec_id}/book/`, "POST", {
@@ -146,21 +193,28 @@ export default function PregnancyCard({ pregnancy }: Props) {
           </AlertBox>
         )}
 
+        <ReviewEarlier items={items.filter((i) => i.state === "overdue")}
+          onResolve={(targets, resolution, note) => resolveMany(targets, resolution, note)} />
+
         <section className="flex flex-col gap-4" aria-label="Schedule of checks">
           {grouped.filter((g) => g.rows.length).map((g) => (
-            <div key={g.state} className="flex flex-col gap-2">
-              <h4 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            // Only what needs action is open; the rest is one tap away, so a long schedule stays readable.
+            <details key={g.state} open={g.state === "overdue" || g.state === "due"} className="flex flex-col">
+              <summary className="flex cursor-pointer items-center gap-2 text-sm font-semibold text-foreground">
                 {STATE_LABEL[g.state]}
                 <Badge variant={STATE_BADGE[g.state]}>{g.rows.length}</Badge>
-              </h4>
-              <ul className="flex flex-col gap-2">
+              </summary>
+              <ul className="mt-2 flex flex-col gap-2">
                 {g.rows.map((item) => (
                   <ItemRow key={item.id} item={item} pregnancyId={pregnancy.id}
-                    onDone={markDone} onBook={bookVisit} onNoShow={noShow} />
+                    onDone={markDone} onBook={bookVisit} onNoShow={noShow}
+                    onResolve={(i, resolution, note, onDate) => resolveMany([i], resolution, note, onDate)}
+                    onReopen={reopen} />
                 ))}
               </ul>
-            </div>
+            </details>
           ))}
+          <AddCheck onAdd={addCheck} />
         </section>
 
         <Separator />
@@ -196,7 +250,7 @@ export default function PregnancyCard({ pregnancy }: Props) {
           <h4 className="text-sm font-semibold text-foreground">Alerts</h4>
           {alerts.length === 0 && <p className="text-sm text-muted-foreground">No alerts.</p>}
           <ul className="flex flex-col gap-2">
-            {alerts.map((a) => (
+            {(allAlerts ? alerts : alerts.slice(0, 5)).map((a) => (
               <li key={a.id} className="flex flex-wrap items-start gap-2 rounded-md border bg-soft-background px-3 py-2 text-sm">
                 <Badge variant={a.audience === "patient" ? "info" : "neutral"}>{a.audience}</Badge>
                 <span className="min-w-0 flex-1 text-foreground">{a.message}</span>
@@ -204,6 +258,13 @@ export default function PregnancyCard({ pregnancy }: Props) {
               </li>
             ))}
           </ul>
+          {alerts.length > 5 && (
+            <div>
+              <Button type="button" size="sm" variant="ghost" onClick={() => setAllAlerts((v) => !v)}>
+                {allAlerts ? "Show only the latest 5" : `Show all ${alerts.length} alerts`}
+              </Button>
+            </div>
+          )}
         </section>
       </CardContent>
     </Card>
@@ -216,27 +277,42 @@ function ItemRow({
   onDone,
   onBook,
   onNoShow,
+  onResolve,
+  onReopen,
 }: {
   item: ScheduleItem;
   pregnancyId: string;
   onDone: (i: ScheduleItem, d: string) => void;
   onBook: (i: ScheduleItem, d: string, time: string) => Promise<void>;
   onNoShow: (i: ScheduleItem) => void;
+  onResolve: (i: ScheduleItem, resolution: Exclude<Resolution, "">, note: string, onDate: string) => Promise<void>;
+  onReopen: (i: ScheduleItem) => void;
 }) {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [booking, setBooking] = useState(false);
-  const open = item.state !== "done" && item.state !== "waiting";
-  const bookable = item.state !== "done";
+  const [closing, setClosing] = useState(false);
+  const resolved = item.state === "elsewhere" || item.state === "waived";
+  const open = item.state !== "done" && item.state !== "waiting" && !resolved;
+  const bookable = item.state !== "done" && !resolved;
   const appointment = item.appointment_at
     ? new Date(item.appointment_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })
     : null;
-  const when = item.done_on ? `Done ${item.done_on}` : item.due_to ? `Due by ${item.due_to}` : item.waiting_on;
+  const when = item.done_on
+    ? `Done ${item.done_on}`
+    : item.state === "elsewhere"
+      ? `Done elsewhere${item.resolved_on ? ` on ${item.resolved_on}` : ""}${item.resolution_note ? `: ${item.resolution_note}` : ""}`
+      : item.state === "waived"
+        ? `Not needed: ${item.resolution_note}`
+        : item.due_to ? `Due by ${item.due_to}` : item.waiting_on;
 
   return (
     <li className="flex flex-col gap-3 rounded-lg border bg-background p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 flex-col gap-1">
-          <span className="text-sm font-medium text-foreground">{item.label}</span>
+          <span className="text-sm font-medium text-foreground">
+            {item.label}
+            <Badge variant="neutral" className="ml-2 align-middle">{kindLabel(item.kind)}</Badge>
+          </span>
           <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             {when}
             {appointment && <Badge variant="info">Appointment {appointment}</Badge>}
@@ -260,8 +336,22 @@ function ItemRow({
               {booking ? "Close calendar" : item.appointment_at ? "Rebook" : "Book visit"}
             </Button>
           )}
+          {(open || item.state === "waiting") && !item.appointment_at && (
+            <Button type="button" size="sm" variant="ghost" onClick={() => setClosing((c) => !c)}>
+              {closing ? "Cancel" : "Not done here"}
+            </Button>
+          )}
+          {resolved && (
+            <Button type="button" size="sm" variant="ghost" onClick={() => onReopen(item)}>Reopen</Button>
+          )}
         </div>
       </div>
+      {closing && (
+        <CloseCheck onResolve={async (resolution, note, onDate) => {
+          await onResolve(item, resolution, note, onDate);
+          setClosing(false);
+        }} />
+      )}
       {bookable && booking && (
         <BookVisit pregnancyId={pregnancyId} item={item} onBook={async (i, d, t) => {
           await onBook(i, d, t);

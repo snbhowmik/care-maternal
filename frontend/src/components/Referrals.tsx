@@ -43,6 +43,7 @@ export default function Referrals({ pregnancyId }: Props) {
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [creating, setCreating] = useState(false);
 
   const reload = useCallback(async () => {
     try {
@@ -77,10 +78,16 @@ export default function Referrals({ pregnancyId }: Props) {
   };
 
   const start = async () => {
-    const ok = await act("Referral created. Record the patient's consent before sending.", () =>
-      request("/referrals/", "POST", { pregnancy: pregnancyId, peer, reason }),
-    );
-    if (ok) setReason("");
+    if (creating) return; // one click, one referral
+    setCreating(true);
+    try {
+      const ok = await act("Referral created. Record the patient's consent before sending.", () =>
+        request("/referrals/", "POST", { pregnancy: pregnancyId, peer, reason }),
+      );
+      if (ok) setReason("");
+    } finally {
+      setCreating(false);
+    }
   };
 
   return (
@@ -119,8 +126,8 @@ export default function Referrals({ pregnancyId }: Props) {
             placeholder="Why is the patient being referred?" />
         </Field>
         <div>
-          <Button type="button" size="sm" disabled={!peer || !reason.trim()} onClick={start}>
-            Create referral
+          <Button type="button" size="sm" disabled={!peer || !reason.trim() || creating} onClick={start}>
+            {creating ? "Creating…" : "Create referral"}
           </Button>
         </div>
       </div>
