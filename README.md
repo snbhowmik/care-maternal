@@ -3,7 +3,11 @@
 A maternal care plugin for [CARE](https://github.com/ohcnetwork/care), built for a two-hospital referral
 demo: a rural PHC refers a pregnant patient to a district hospital, with consent, deadlines and escalation.
 
-**Synthetic data only. Clinical content is pending clinician review. Not for clinical use.**
+**Synthetic data only. The clinical pathway was reviewed and approved by the doctor partner (Dr. Jershita Vakkalagadda); no clinical validation has been done yet. Not for clinical use.**
+
+Built by team MedAI Minds (code F44W5G) for Health-a-thon 2026, started 13 Oct 2026. It is a plugin for the real
+CARE EMR. A clinic with no EMR can run CARE plus this plugin as one standalone system on one server. Tech team: SRM
+Institute of Science and Technology. Sarvam AI translation of reminders is a test implementation and is not built yet.
 
 ## What it does
 
@@ -84,8 +88,8 @@ Set these in the plugin's Compose override (no secrets in code):
 
 ## Known limits (MVP)
 
-- The clinical spec is unsigned. Every seeded check is `medium` until a clinician sets priorities, and reminder
-  timings are defaults.
+- The pathway is approved by the doctor partner, but the approval is not yet recorded in the spec's `meta.signoff`
+  block. Every seeded check is `medium` until priorities are set in the app, and reminder timings are defaults.
 - SMS is console only. Nothing reaches a real phone.
 - Patient login uses a fixed code in non-production builds (CARE core behaviour).
 - Districts are not loaded; the address list has states and union territories only.

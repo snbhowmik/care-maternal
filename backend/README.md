@@ -8,8 +8,7 @@ CARE's runtime and registered through `ADDITIONAL_PLUGS`. It follows the OHC plu
 layout (`src/`, `pyproject.toml`, `Makefile`, `docs/`). CARE core is unchanged.
 
 The pathway comes from a clinician-authored PDF (`IMG_1737.pdf`). It is transcribed into
-`src/care_maternal/spec/maternal_pathway.yaml` (each item records its source page). **Clinician
-sign-off is still pending**, and spec open questions Q1 to Q7 are unanswered.
+`src/care_maternal/spec/maternal_pathway.yaml` (each item records its source page). The doctor partner has approved the pathway; **the approval is not yet recorded in the spec's `meta.signoff` block**, and answers to open questions Q1 to Q7 are not recorded.
 
 ## What it does
 
@@ -168,7 +167,7 @@ restart the `celery` service so it re-registers them.
 ## Known limits
 
 **Clinical (need a clinician)**
-1. The spec is unsigned and open questions Q1 to Q7 are unanswered (emergency wording, high-risk
+1. Record the approval in the spec, and record answers to open questions Q1 to Q7 (emergency wording, high-risk
    criteria, postnatal schedule, labour thresholds, missed-visit grace period, mandatory results,
    Td protocol).
 2. Every seeded check is `medium`; nothing is `high` until a clinician sets it. Reminder timings are defaults.

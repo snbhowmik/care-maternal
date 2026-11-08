@@ -84,7 +84,7 @@ Log in as `care-admin` and open the facility's settings: the details can be edit
 
 ## Say these out loud
 
-- Clinical content is unreviewed: sign-off is pending and open questions Q1 to Q7 are unanswered.
+- The pathway is approved by the doctor partner, but the approval is not recorded in the spec file and open questions Q1 to Q7 are not recorded as answered. No clinical validation yet.
 - Every check is `medium` until a clinician sets priorities; reminder timings are defaults.
 - SMS is console only. Nothing reaches a real phone.
 - Patient login uses CARE's fixed dev code `45612` on non-production stacks. All patients are synthetic.
