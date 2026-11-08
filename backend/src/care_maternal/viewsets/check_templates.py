@@ -18,6 +18,7 @@ def template_json(t: MaternalCheckTemplate) -> dict:
         "relative_to": t.relative_to,
         "after_days": t.after_days,
         "waiting_note": t.waiting_note,
+        "priority": t.priority,
         "active": t.active,
         "sort_order": t.sort_order,
         "source": t.source,

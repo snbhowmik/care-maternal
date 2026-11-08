@@ -11,6 +11,7 @@ import yaml
 
 SPEC_PATH = Path(__file__).resolve().parent.parent / "spec" / "maternal_pathway.yaml"
 EDD_DAYS = 280  # Naegele's rule: LMP + 280 days
+PRIORITIES = ("high", "medium", "low", "optional")
 _GA = re.compile(r"^(\d+)(?:\+([0-6]))?$")
 
 
@@ -84,6 +85,7 @@ def items_from_templates(lmp: date, templates: list[dict]) -> list[dict]:
                 "spec_id": t["spec_id"],
                 "kind": t["kind"],
                 "label": t["label"],
+                "priority": t.get("priority") or "medium",
                 "due_from": None if relative else ga_date(lmp, t["from_weeks"]),
                 "due_to": None if relative else ga_date(lmp, t["to_weeks"]),
                 "waiting_on": (t.get("waiting_note") or f"after {t['relative_to']} is recorded")

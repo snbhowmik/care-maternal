@@ -12,6 +12,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/careui/table";
+import DutyCard from "@/components/DutyCard";
+import RemindersCard from "@/components/RemindersCard";
 import type { WorklistRow } from "@/types";
 import { currentFacilityId, errorMessage, request } from "@/utils/api";
 
@@ -54,6 +56,11 @@ export default function MaternalPage() {
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <DutyCard />
+        <RemindersCard />
+      </div>
 
       <Card>
         <CardContent>

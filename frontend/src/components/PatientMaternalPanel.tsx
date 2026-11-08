@@ -79,17 +79,21 @@ function Panel({ patient }: PatientHomeProps) {
         )}
 
         {pregnancies?.map((p) => {
-          const items = (history[p.id] ?? []).filter((i) => i.state !== "waived");
-          const notNeeded = (history[p.id] ?? []).length - items.length;
-          const done = items
-            .filter((i) => i.done_on || i.state === "elsewhere")
+          const every = history[p.id] ?? [];
+          // Optional checks are not mandatory, and not-needed checks are closed: neither counts against her.
+          const items = every.filter((i) => i.state !== "waived" && i.priority !== "optional");
+          const notNeeded = every.filter((i) => i.state === "waived").length;
+          const done = every
+            .filter((i) => i.state !== "waived" && (i.done_on || i.state === "elsewhere"))
             .sort((a, b) => (b.done_on ?? b.resolved_on ?? "").localeCompare(a.done_on ?? a.resolved_on ?? ""));
           return (
             <div key={p.id} className="flex flex-col gap-4">
               <section className="flex flex-col gap-2" aria-label="Checks made">
                 <h4 className="flex items-center gap-2 text-sm font-semibold text-foreground">
                   Checks made
-                  <Badge variant={done.length ? "success" : "neutral"}>{done.length} of {items.length}</Badge>
+                  <Badge variant={done.length ? "success" : "neutral"}>
+                    {items.filter((i) => i.done_on || i.state === "elsewhere").length} of {items.length}
+                  </Badge>
                   {notNeeded > 0 && <span className="text-xs font-normal text-muted-foreground">{notNeeded} marked not needed</span>}
                 </h4>
                 {done.length > 0 && (

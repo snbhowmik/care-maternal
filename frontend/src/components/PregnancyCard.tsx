@@ -15,7 +15,7 @@ import { Checkbox } from "@/components/careui/checkbox";
 import { Input } from "@/components/careui/input";
 import { Label } from "@/components/careui/label";
 import { Separator } from "@/components/careui/separator";
-import { EMERGENCY_SYMPTOMS, kindLabel } from "@/types";
+import { EMERGENCY_SYMPTOMS, kindLabel, priorityMeta } from "@/types";
 import type { Alert, ItemState, Pregnancy, Resolution, ScheduleItem } from "@/types";
 import { currentFacilityId, errorMessage, request } from "@/utils/api";
 
@@ -145,6 +145,7 @@ export default function PregnancyCard({ pregnancy }: Props) {
         kind: check.kind,
         due_from: check.due_from || null,
         due_to: check.due_to || null,
+        priority: check.priority,
         facility: currentFacilityId(),
       });
       added = true;
@@ -312,6 +313,11 @@ function ItemRow({
           <span className="text-sm font-medium text-foreground">
             {item.label}
             <Badge variant="neutral" className="ml-2 align-middle">{kindLabel(item.kind)}</Badge>
+            {item.priority !== "medium" && (
+              <Badge variant={priorityMeta(item.priority).badge} className="ml-1 align-middle">
+                {priorityMeta(item.priority).label}
+              </Badge>
+            )}
           </span>
           <span className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             {when}

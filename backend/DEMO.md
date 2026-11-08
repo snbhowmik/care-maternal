@@ -1,83 +1,92 @@
-# Demo runbook: Care Maternal (MVP)
+# Test runbook: Care Maternal (MVP)
 
-Synthetic data only. Not for clinical use. Everything runs on this laptop.
+Synthetic data only. Not for clinical use. Use this to try every feature on the live hospitals.
 
-## 1. Start the system
-
-From the scaffold workspace (`/home/snbhowmik/CODE/care-maternal-workspace`):
-
-```bash
-# Backend (CARE + care_maternal). Safe to run when already up.
-.agent/compose.sh up -d --wait
-.agent/compose.sh exec -T backend python manage.py seed_maternal_demo
-
-# Plugin remote (serves the built maternal page on :29418)
-(cd care_maternal_fe && npm run dev)            # keep running
-
-# Host frontend (CARE on :29417, with the maternal plugin enabled)
-.agent/frontend.sh                              # keep running
-```
-
-Wait for `backend` to show `healthy` in `.agent/compose.sh ps`.
-
-## 2. Accounts and URLs
-
-| What | Where | Login |
+| | Hospital A: Rural PHC Alpha (refers) | Hospital B: District Hospital Beta (receives) |
 |---|---|---|
-| CARE staff app | http://localhost:29417 | `care-doctor` / `(see the private logins file)` |
-| Maternal staff page | http://localhost:29417/facility/27a7244d-8daa-4234-90d5-cb2d27aebc4b/maternal?patient=5be80b0e-faa2-48c6-86d0-5c61ea3839d3 | (same as above) |
-| Patient portal | http://localhost:29416/api/care_maternal/portal/ | phone `+919999000001`, code `45612` |
-| Server log (demo SMS) | `.agent/compose.sh logs backend \| grep DEMO` | — |
+| App | https://hospital-a.ccoogo.co | https://hospital-b.ccoogo.co |
+| API | https://api-hospital-a.ccoogo.co | https://api-hospital-b.ccoogo.co |
+| Facility | FACILITY WITH PATIENTS (`70429f2a-8b2e-458f-ac6e-66c6fd2bd8e5`) | FACILITY WITH PATIENTS (`5d48f127-106e-4d73-933c-c6220c0da91f`) |
 
-The demo patient is `SYNTHETIC Demo Patient`. The seed command prints its ID.
-The facility is in the fixtures. The doctor is linked to the patient with the Doctor role.
+**Logins** are in a private file on the laptop (`~/.config/care-clinic/demo-hospital-logins.txt`), never in
+this repo: `care-doctor` (a Doctor), `care-admin` (Facility Admin), at each hospital.
 
-## 3. Demo script (about 5 minutes)
+Before you start: press **Ctrl+Shift+R** to clear a cached copy of the plugin. The first page load can sit on
+"LOADING..." for up to a minute (the development server is preparing its files).
 
-**Staff side (CARE app, as `care-doctor`):**
-1. Open the maternal page above. Show the header: gestational age, EDD, G/P/A/L.
-2. Show the schedule grouped by state: overdue, due, upcoming, waiting, done.
-3. Under "Td-1", set a date and press **Mark done**. Show that Td-2 is now due 4 weeks later.
-4. Under "Report emergency symptoms", tick **Vaginal bleeding** and press **Report emergency**.
-   Show the clinician alert and "(SMS sent)" on the patient alert.
-5. Show the server log line: `[DEMO] Please come to the clinic now.` This is the patient SMS.
+## 1. Register and enrol
 
-**Patient side (portal):**
-6. Open the portal. Enter `+919999000001` and press **Send login code**.
-7. Read the code from the server log (`[DEMO] Your CARE Maternal login code is ...`), or use
-   `45612`, the dev code. Enter it and press **Sign in**.
-8. Show the patient's pregnancy, schedule and messages. Note that clinician alerts are not
-   shown to the patient.
+1. Patients → **Add New Patient** and fill in the form. Register in the UI, not through the API: patients made
+   through the API do not appear on the hospital's lists. The **State** list should show every state.
+2. You land on the patient page. Press **Patient Home** (under Actions on the right) and scroll to **Maternal checks**.
+3. Enter an LMP (for example 20 weeks ago) and press **Create pregnancy**.
+4. Check: the profile shows the **Maternal** tag; Patients → **Maternal care** lists the patient.
 
-## 4. Check it works
+## 2. A patient who enrols late
+
+The patient's overdue checks appear in a box: "N earlier checks are overdue". Ask the patient which she has
+had. Tick them and press **Had these elsewhere** (add where, if known) or **Not needed** (a reason is
+required). Each check also has **Not done here** for one at a time. **Reopen** undoes it. Closed checks stop
+counting as overdue.
+
+## 3. The check list (doctors and facility admins)
+
+Left menu → **Maternal check list**. Add a check (by weeks of pregnancy, after another check, or the doctor
+sets the date), set its **priority**, edit it, or turn it off with the switch. It applies to patients enrolled
+from now on. Nurses can read the list but not change it. On one patient, use **Add a check for this patient**.
+
+## 4. Book, no-show, home visit
+
+1. **Book visit** on a check: pick a date on the calendar and a time. Taken times are disabled. The check
+   shows an **Appointment** badge; the patient's **Appointments** tab lists it.
+2. **No-show** turns it back into a due check. After three no-shows on one check a **Home visits** box appears
+   with the patient's address (unassigned unless an `ASHA Worker` is set up).
+3. Automatic: book a time that has already passed today (at least 30 minutes ago). Within about 5 minutes it is
+   marked no-show.
+
+## 5. Priority, reminders and duty
+
+Maternal care page: switch **On duty**. Reminders go to everyone on duty (and to the whole team if nobody is).
+Set a check to **High** on the check list, or add one for a patient, and watch **Your reminders** (the sweep runs
+every 15 minutes, 08:00 to 20:00). Rules: high 3 days early, up to 3 a day; medium 1 day early, twice a day; low
+once, on the due date; optional never (and never keeps the tag). **Mark seen** closes a reminder.
+
+## 6. Refer to hospital B
+
+1. On hospital A, in the patient card: **Refer to another hospital**, choose District Hospital Beta, give a reason,
+   **Create referral**, **Record consent**, **Send**.
+2. On hospital B, left menu → **Referrals received**: **Acknowledge**, write the findings, **Record examination**.
+3. Back on A the referral says "Patient examined", with a timeline. B now shows the patient with the Maternal tag.
+4. Escalation: if B does not acknowledge within 24 hours the referral becomes "Handover incomplete" and A can
+   record a check, refer again, or manage the patient here. To expire a referral for a demo, on the server run
+   `~/hospital-a/.agent/compose.sh exec -T backend python manage.py demo_expire_handover <referral id>`.
+
+## 7. Eka Care scribe
+
+Patient Home → **Create Encounter** → open a questionnaire form (for example Vitals) → **AI Scribe**. Allow the
+microphone, talk, **Stop and process**, and review the filled fields before submitting. The scribe asks CARE for a
+30 minute token; the Eka secret stays on the server.
+
+## 8. Facility settings
+
+Log in as `care-admin` and open the facility's settings: the details can be edited.
+
+## 9. Check it from a terminal
 
 ```bash
-.agent/compose.sh exec -T backend python manage.py test care_maternal.tests.test_schedule care_maternal.tests.test_services_api
-(cd care_maternal_fe && npm run build)
+.agent/compose.sh exec -T backend python manage.py test \
+  care_maternal.tests.test_schedule care_maternal.tests.test_services_api care_maternal.tests.test_referrals \
+  care_maternal.tests.test_tags care_maternal.tests.test_booking care_maternal.tests.test_no_show \
+  care_maternal.tests.test_registrar_link care_maternal.tests.test_access care_maternal.tests.test_eka \
+  care_maternal.tests.test_check_list care_maternal.tests.test_reminders       # 96 tests
+(cd care_maternal_fe && npx tsc --noEmit -p . && npm run build)
 ```
 
-Expected: 18 backend tests pass, and the frontend builds with no errors.
+## Say these out loud
 
-## 5. Known limits to say out loud
-
-- **Clinical content is unreviewed.** The schedule is from the PDF. Clinician sign-off is
-  pending, and open questions Q1–Q7 are unanswered (see `spec/maternal_pathway.yaml`).
-- **Patient SMS is console only.** Nothing reaches a real phone. The emergency text is marked
-  `[DEMO]` and awaits clinician wording.
-- **Dev login code is fixed** (`45612`) and the demo SMS endpoint prints live codes. Both are
-  disabled in production, and this stack is not production.
-- **Staff page picks a patient by ID.** No name search yet.
-- **No worklist across patients** and **no alert acknowledgement** yet.
-- **Patient portal is an HTML demo page**, not the React app. The host has no patient page
-  surface to host a React one.
-- **Overdue alerts can flood.** An old pregnancy raised 41 overdue alerts in one check.
-
-See `README.md` and `care_maternal_fe/README.md` for the full list of known issues.
-
-## 6. Stop
-
-```bash
-.agent/compose.sh down        # stops this stack; keeps data (never add -v without approval)
-```
-
-Stop the two `npm run dev` and `frontend.sh` terminals with Ctrl+C.
+- Clinical content is unreviewed: sign-off is pending and open questions Q1 to Q7 are unanswered.
+- Every check is `medium` until a clinician sets priorities; reminder timings are defaults.
+- SMS is console only. Nothing reaches a real phone.
+- Patient login uses CARE's fixed dev code `45612` on non-production stacks. All patients are synthetic.
+- Any staff member at the receiving hospital can acknowledge an inbound referral.
+- Districts are not loaded; the address list has states and union territories only.

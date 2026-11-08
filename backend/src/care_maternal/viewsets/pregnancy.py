@@ -124,7 +124,9 @@ class PregnancyViewSet(GenericViewSet):
                     "overdue_checks": 0,
                 })
             for pregnancy in pregnancies:
-                open_items = pregnancy.items.filter(deleted=False, done_on__isnull=True, resolution="")
+                open_items = pregnancy.items.filter(
+                    deleted=False, done_on__isnull=True, resolution=""
+                ).exclude(priority="optional")
                 rows.append({
                     "patient_id": str(patient.external_id),
                     "patient_name": patient.name,
@@ -197,7 +199,8 @@ class PregnancyViewSet(GenericViewSet):
     @action(detail=True, methods=["get"])
     def alerts(self, request, external_id=None):
         pregnancy = self._pregnancy(request, external_id)
-        qs = pregnancy.alerts.filter(deleted=False).order_by("-created_date")
+        # Reminders for staff are one per person; they live in each person's own feed, not here.
+        qs = pregnancy.alerts.filter(deleted=False).exclude(audience="staff").order_by("-created_date")
         return Response(AlertSerializer(qs, many=True).data)
 
     @action(detail=True, methods=["post"], url_path=r"items/(?P<spec_id>[^/]+)/no-show")
@@ -250,6 +253,7 @@ class PregnancyViewSet(GenericViewSet):
             _optional_date(request.data.get("due_from")),
             _optional_date(request.data.get("due_to")),
             request.user,
+            request.data.get("priority", "medium"),
         )
         facility = _facility_from(request.data.get("facility"))
         if facility:

@@ -1,134 +1,92 @@
 # Demo script: a patient escalated from a rural hospital to a district hospital
 
 Synthetic data only. Not for clinical use. The clinical wording is pending clinician review.
+For the full feature walkthrough see `DEMO.md`.
 
 ## What is running
 
-Both hospitals are separate CARE instances on one server (13.200.255.164), each with the
-care_maternal plugin:
+Two separate CARE instances on one EC2 server (`13.200.255.164`), each with the `care_maternal` plugin.
+They are public through named Cloudflare tunnels on the `ccoogo.co` domain.
 
 | | Hospital A | Hospital B |
 |---|---|---|
 | Name | Rural PHC Alpha (refers) | District Hospital Beta (receives) |
-| Frontend | 127.0.0.1:18417 | 127.0.0.1:28417 |
-| API | 127.0.0.1:18416 | 127.0.0.1:28416 |
-| Plugin files | 127.0.0.1:18418 | 127.0.0.1:28418 |
+| App | https://hospital-a.ccoogo.co | https://hospital-b.ccoogo.co |
+| API | https://api-hospital-a.ccoogo.co | https://api-hospital-b.ccoogo.co |
+| Plugin files | https://plugin-hospital-a.ccoogo.co | https://plugin-hospital-b.ccoogo.co |
+| Plugin files, scribe | `.../eka/assets/remoteEntry.js` on the same host | same |
+| On the server (loopback) | frontend 18417, API 18416, plugin 18418 | frontend 28417, API 28416, plugin 28418 |
 
-They talk to each other over a private Docker link (`hospital-link`). Nothing is published to
-the internet. The ports listen on the server's loopback address only.
+The hospitals refer to each other over a private Docker network (`hospital-link`), not over the internet:
+A calls `http://hospital-b-backend:9000` and B calls `http://hospital-a-backend:9000`, each with a bearer token.
+The tunnels run as systemd services (`cloudflared-hospital-a`, `cloudflared-hospital-b`), with their tokens in
+root-only files under `/etc/cloudflared/`.
 
-## Public access (live now)
+- **Logins:** `care-doctor` and `care-admin` at each hospital. The passwords are in a private file on the
+  laptop (`~/.config/care-clinic/demo-hospital-logins.txt`), not in this document.
+- **Eka Care:** the client ID and secret are in `~/hospital-{a,b}/.agent/eka.env` (mode 600) on the server.
+- The demo SMS endpoint is off on both hospitals. Patient login uses CARE's fixed dev code `45612`.
+- The first page load takes up to a minute (development server). Access is not behind a login wall in front of
+  the tunnels; add Cloudflare Access before any real use.
+- Cloudflare caches plugin files in browsers for 4 hours. Press Ctrl+Shift+R after a deploy, or set Browser Cache
+  TTL to "Respect Existing Headers".
 
-Both hospitals are reachable from the internet through Cloudflare quick tunnels:
-
-| | Hospital A (Rural PHC Alpha) | Hospital B (District Hospital Beta) |
-|---|---|---|
-| Open the app | https://moss-juan-older-refinance.trycloudflare.com | https://electro-equally-dial-linear.trycloudflare.com |
-| API | https://elliott-boston-spent-struggle.trycloudflare.com | https://encoding-performances-provides-identifies.trycloudflare.com |
-
-- Quick-tunnel addresses change if the tunnels or the server restart. Ask for the current ones.
-- Logins: `care-doctor` and `care-admin` at each hospital. The passwords are in a private file on
-  the laptop: `~/.config/care-clinic/demo-hospital-logins.txt`. They are not in this document.
-- The demo SMS endpoint is off on both public hospitals. The fixed patient login code `45612`
-  still works, because it is built into CARE for non-production stacks. All patients are synthetic.
-- The first page load takes one to two minutes (the development server builds its files).
-- Access is not gated by a login wall in front of the tunnels. Add Cloudflare Access before real use.
-
-## Private access (fallback)
+## Deploy a change (from the laptop)
 
 ```bash
-ssh -i ~/Downloads/thinkpad.pem -N \
-  -L 18416:127.0.0.1:18416 -L 18417:127.0.0.1:18417 -L 18418:127.0.0.1:18418 \
-  -L 28416:127.0.0.1:28416 -L 28417:127.0.0.1:28417 -L 28418:127.0.0.1:28418 \
-  ubuntu@13.200.255.164
+KEY=~/Downloads/thinkpad.pem; H=ubuntu@13.200.255.164
+for h in hospital-a hospital-b; do
+  rsync -az -e "ssh -i $KEY" --exclude node_modules --exclude dist care_maternal_fe/ $H:/home/ubuntu/$h/care_maternal_fe/
+  rsync -az -e "ssh -i $KEY" --exclude __pycache__ --exclude '*.egg-info' care/care_maternal/ $H:/home/ubuntu/$h/care/care_maternal/
+done
+ssh -i $KEY $H 'for h in hospital-a hospital-b; do
+  cd ~/$h && ./.agent/compose.sh exec -T backend python manage.py migrate care_maternal
+  ./.agent/compose.sh restart backend celery
+  cd ~/$h/care_maternal_fe && npx vite build
+done'
 ```
 
-Then open http://localhost:18417 (Hospital A) and http://localhost:28417 (Hospital B).
+Notes: the Eka scribe is built into `dist/eka` (`npx vite build --base /eka/ --outDir ../care_maternal_fe/dist/eka`
+in `care_eka_scribe_fe`); a plugin build keeps it because `emptyOutDir` is false. Both CARE frontends read
+`REACT_ENABLED_APPS` from `.agent/frontend.env` at start, so changing it needs `.agent/frontend.sh` restarted.
 
-## How to open the demo from your laptop (private, via SSH)
+## The three stories
 
-```bash
-ssh -i ~/Downloads/thinkpad.pem -N \
-  -L 18416:127.0.0.1:18416 -L 18417:127.0.0.1:18417 -L 18418:127.0.0.1:18418 \
-  -L 28416:127.0.0.1:28416 -L 28417:127.0.0.1:28417 -L 28418:127.0.0.1:28418 \
-  ubuntu@13.200.255.164
-```
+Use any patient registered in the UI, enrolled with an LMP, at hospital A.
 
-Then open:
-- Hospital A: http://localhost:18417
-- Hospital B: http://localhost:28417
+### Routine care
+Show the schedule, mark one check done, book a visit from the calendar (see `DEMO.md` section 4).
 
-Log in as `care-doctor` (password in the private file above).
+### A handover that completes
+On A, in **Refer to another hospital**: choose District Hospital Beta, give a reason, **Create referral**,
+**Record consent**, **Send**. On B, **Referrals received**: **Acknowledge**, write the findings, **Record examination**.
+On A the referral shows "Patient examined" with its timeline. B now holds the patient with the Maternal tag.
 
-Facility: "FACILITY WITH PATIENTS" on both hospitals (from the CARE fixtures).
-
-## The three patients (at Hospital A)
-
-| Patient | Story | Patient ID |
-|---|---|---|
-| SYNTHETIC Anita (routine) | Routine antenatal care. No referral. | `ed9887c2-6a74-4a01-a09f-36e612b6261b` |
-| SYNTHETIC Lakshmi (handover) | Referred to District Hospital Beta. Consent given, acknowledged, examined. | `7755ae63-5d03-4238-aeee-ed0c0c99d4b3` |
-| SYNTHETIC Meena (escalation) | Referred. District Hospital Beta never acknowledges. Deadline passes. Rural PHC refers again. | `e44d4312-a641-4f6f-be52-8f50da3f6f3b` |
-
-Open a patient: Hospital A, then "Maternal care", then paste the ID in the box, then "Open".
-
-## Scene 1: routine care (Anita, 2 minutes)
-
-1. Show the pregnancy header: gestational age, EDD, G/P/A/L.
-2. Show the schedule grouped as overdue, due, upcoming, waiting and done.
-3. Click "Book visit" on a visit. It becomes a real CARE appointment, which the patient
-   sees under Appointments with its date and time.
-
-## Scene 2: a handover that completes (Lakshmi, 4 minutes)
-
-On Hospital A, Lakshmi's pregnancy card, "Refer to another hospital":
-1. Choose "District Hospital Beta". Write the reason. Press "Create referral".
-2. Press "Record consent" (consent by: patient). A referral without consent cannot be sent.
-3. Press "Send to District Hospital Beta".
-
-On Hospital B (http://localhost:28417), "Referrals received":
-4. The referral is listed with the patient's name and reason. Press "Acknowledge".
-5. Write the examination findings and press "Record examination".
-
-Back on Hospital A: the referral shows "Patient examined", and its timeline lists each step.
-
-## Scene 3: an escalation (Meena, 5 minutes)
-
-On Hospital A, Meena's pregnancy card:
-1. Create the referral to District Hospital Beta, record consent, and send it.
-2. Hospital B does not acknowledge. The deadline is 24 hours. For the demo, expire it:
-   on the server, run
-   `~/hospital-a/.agent/compose.sh exec -T backend python manage.py demo_expire_handover <referral id>`
-   (demo only; refused in production). The sweep marks it incomplete within 5 minutes, or run
-   "Run overdue check" in the maternal page.
-3. Hospital A now shows "Handover incomplete: deadline passed", with a clinician alert.
-4. Choose a next step:
-   - "Record check": write what you found on the phone call with the family.
-   - "Refer again": choose the hospital, write the reason, then record consent again and send.
-   - "Manage here": write the plan. The clinician is alerted.
-5. The new referral appears in Hospital B's "Referrals received".
+### An escalation
+Send a referral that B does not acknowledge. The deadline is 24 hours; to expire it for the demo, on the server:
+`~/hospital-a/.agent/compose.sh exec -T backend python manage.py demo_expire_handover <referral id>` (demo only,
+refused in production). Within 5 minutes A shows "Handover incomplete: deadline passed" with a clinician alert.
+Choose **Record check**, **Refer again** (a new referral to the hospital you pick, with new consent), or
+**Manage here** (the plan is recorded and the clinician alerted).
 
 ## Known limits (say these out loud)
 
-- **Test data is already present.** A previous automated run moved these three patients
-  through the flow, and Hospital B's inbox has duplicate test referrals. A clean demo needs a
-  reset of both hospitals. That drops data, so it needs approval first.
-- **Access is private only.** The hospitals are not on the internet. Public access needs
-  approval and an access control layer (for example Cloudflare Access).
-- **Any logged-in staff member at Hospital B can acknowledge or examine any inbound referral.**
-  Acknowledging makes that doctor the patient's doctor. Scope the inbox to the facility before
-  real use.
-- **Consent is recorded as text** ("by: patient"). The patient-side consent endpoint exists;
-  its portal screen is not built yet.
-- **No automatic reminders to ASHA workers yet.** The deadline check is automatic (every
-  5 minutes), but the ASHA home-visit reminder is not built.
+- **No test data is preloaded.** The synthetic patients were removed. Register patients in the UI; patients made
+  through the API do not appear on the hospital's lists.
+- **Any logged-in staff member at hospital B can acknowledge or examine any inbound referral.** Acknowledging links
+  that doctor to the patient. Scope the inbox to the facility before real use.
+- **Consent is recorded as text** ("by: patient"). A patient-side consent endpoint exists; its portal screen is not built.
 - **SMS is console only.** Nothing reaches a real phone.
 - **Development servers.** The frontends run Vite's dev server, not a production build.
-- **Demo passwords and fixed codes** (`(see the private logins file)`, login code `45612`) are for this test only.
+- **Public access has no login wall** in front of the tunnels.
+- **Passwords and fixed codes** in a private file and `45612` are for this test only.
 
 ## Checks that were run
 
-- `care_maternal` backend tests: 30 pass (schedule, services and API, handover).
-- Two-hospital HTTP test (`handover_two_hospitals.py`): 19 of 19 checks pass across the two
-  instances.
-- Browser checks on the referral panel and the inbox: pass, with no page errors.
+- 96 backend tests pass (schedule, services and API, referrals, tags, booking, no-show, registrar link, access,
+  Eka token, check list, reminders), on the laptop and on hospital A's server.
+- A two-hospital HTTP test (`.agent/e2e/handover_two_hospitals.py`) passed 19 of 19 checks across the two instances.
+- Browser checks on the public hostnames (Playwright scripts in `.agent/e2e/`) for the worklist, the patient panel,
+  the check list, the duty and reminders cards, and the referral inbox, with no page errors.
+- Not checked in a browser: clicking through the booking calendar, the no-show buttons, the late-enrolment review
+  actions, and a real Eka scribe recording.

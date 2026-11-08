@@ -44,6 +44,13 @@ class MaternalScheduleItem(EMRBaseModel):
     no_show_count = models.PositiveSmallIntegerField(default=0)
     # Closed without being done here: the patient had it elsewhere, or the doctor decided it is
     # not needed for this patient. Empty while the check is open. done_on stays empty in both cases.
+    # Copied from the check template when the pregnancy is enrolled. Decides who is reminded, how
+    # early, and how often (see reminders.py). "optional" checks are never mandatory.
+    priority = models.CharField(max_length=8, default="medium", choices=[("high", "High"), ("medium", "Medium"), ("low", "Low"), ("optional", "Optional")])
+    reminders_sent = models.PositiveSmallIntegerField(default=0)
+    last_reminded_at = models.DateTimeField(null=True, blank=True)
+    reminders_today = models.PositiveSmallIntegerField(default=0)
+    reminders_today_on = models.DateField(null=True, blank=True)
     resolution = models.CharField(
         max_length=16, blank=True, default="",
         choices=[("", "Open"), ("elsewhere", "Done elsewhere"), ("not_needed", "Not needed")],
@@ -74,7 +81,12 @@ class MaternalAlert(EMRBaseModel):
         MaternalPregnancy, on_delete=models.CASCADE, related_name="alerts"
     )
     audience = models.CharField(
-        max_length=16, choices=[("clinician", "Clinician"), ("patient", "Patient")]
+        max_length=16,
+        choices=[("clinician", "Clinician"), ("patient", "Patient"), ("staff", "Staff on duty")],
+    )
+    # For audience "staff": the person this reminder is for. Empty for the other audiences.
+    recipient = models.ForeignKey(
+        "users.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
     )
     kind = models.CharField(max_length=32)
     message = models.TextField()
@@ -184,6 +196,8 @@ class MaternalCheckTemplate(EMRBaseModel):
     after_days = models.PositiveSmallIntegerField(null=True, blank=True)
     # Shown while the date is unknown, e.g. "clinician decision".
     waiting_note = models.CharField(max_length=255, blank=True, default="")
+    # Who is reminded, how early and how often. Optional means the record is not mandatory.
+    priority = models.CharField(max_length=8, default="medium", choices=[("high", "High"), ("medium", "Medium"), ("low", "Low"), ("optional", "Optional")])
     active = models.BooleanField(default=True)
     sort_order = models.PositiveIntegerField(default=0)
     source = models.CharField(max_length=8, default="spec", choices=[("spec", "Spec"), ("custom", "Custom")])
@@ -192,3 +206,16 @@ class MaternalCheckTemplate(EMRBaseModel):
         constraints = [
             models.UniqueConstraint(fields=["spec_id"], condition=models.Q(deleted=False), name="unique_maternal_check_spec_id")
         ]
+
+
+class MaternalDuty(EMRBaseModel):
+    """A staff member who is on duty. High, medium and low priority reminders go to people on duty.
+
+    CARE has no duty roster, so staff switch themselves on and off. A forgotten switch expires
+    after DUTY_HOURS, so a reminder is never sent to someone who went home yesterday.
+    """
+
+    user = models.ForeignKey("users.User", on_delete=models.CASCADE, related_name="+")
+    since = models.DateTimeField()
+    until = models.DateTimeField()
+    ended_at = models.DateTimeField(null=True, blank=True)

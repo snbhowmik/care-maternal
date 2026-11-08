@@ -91,6 +91,7 @@ def build_summary(pregnancy: MaternalPregnancy) -> dict:
                 "resolved_on": str(i.resolved_on) if i.resolved_on else None,
                 "custom": i.spec_id.startswith("CUSTOM-"),
                 "kind": i.kind,
+                "priority": i.priority,
             }
             for i in pregnancy.items.filter(deleted=False).order_by("due_from", "spec_id")
         ],
@@ -296,6 +297,7 @@ def receive_referral(payload: dict) -> MaternalReferral:
                 pregnancy, item["label"], item.get("kind", ""),
                 date.fromisoformat(item["due_from"]) if item.get("due_from") else None,
                 date.fromisoformat(item["due_to"]) if item.get("due_to") else None, None,
+                item.get("priority", "medium"),
             )
             mine = pregnancy.items.filter(label=item["label"], spec_id__startswith="CUSTOM-")
         if item.get("done_on"):

@@ -12,13 +12,13 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from care.emr.models.organization import FacilityOrganizationUser
 from care_maternal.models import MaternalCheckTemplate
-from care_maternal.utils.schedule import parse_ga, templates_from_spec
+from care_maternal.utils.schedule import PRIORITIES, parse_ga, templates_from_spec
 
 EDITOR_ROLES = ("Doctor", "Facility Admin", "Administrator", "Admin")
 MAX_WEEKS = 45
 EDITABLE = (
     "label", "kind", "from_weeks", "to_weeks", "relative_to", "after_days",
-    "waiting_note", "active", "sort_order",
+    "waiting_note", "priority", "active", "sort_order",
 )
 
 
@@ -55,6 +55,7 @@ def active_templates() -> list[dict]:
             "spec_id": t.spec_id, "label": t.label, "kind": t.kind,
             "from_weeks": t.from_weeks, "to_weeks": t.to_weeks,
             "relative_to": t.relative_to, "after_days": t.after_days, "waiting_note": t.waiting_note,
+            "priority": t.priority,
         }
         for t in all_templates().filter(active=True)
     ]
@@ -105,6 +106,11 @@ def _clean(data: dict, own_spec_id: str = "") -> dict:
         clean["after_days"] = None if days in (None, "") else int(days)
     if "waiting_note" in data:
         clean["waiting_note"] = str(data["waiting_note"] or "").strip()[:255]
+    if "priority" in data:
+        priority = str(data["priority"] or "").strip().lower()
+        if priority not in PRIORITIES:
+            raise ValidationError({"priority": "Choose high, medium, low or optional."})
+        clean["priority"] = priority
     if "active" in data:
         clean["active"] = bool(data["active"])
     if "sort_order" in data:

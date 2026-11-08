@@ -8,7 +8,7 @@ check, because enrolment is already authorised by the pregnancy endpoints.
 from care.emr.models.patient import Patient
 from care.emr.models.tag_config import TagConfig
 from care.emr.tagging.base import PatientFacilityTagManager
-from care_maternal.models import MaternalPregnancy
+from care_maternal.models import MaternalPregnancy, MaternalScheduleItem
 
 MATERNAL_TAG_DISPLAY = "Maternal"
 
@@ -28,9 +28,15 @@ def ensure_tag(facility) -> TagConfig:
 
 
 def _has_open_checks(patient) -> bool:
-    return MaternalPregnancy.objects.filter(
-        patient=patient, deleted=False, items__done_on__isnull=True, items__resolution="", items__deleted=False
-    ).exists()
+    """A mandatory check is still open. Optional checks never keep the tag."""
+    return (
+        MaternalScheduleItem.objects.filter(
+            pregnancy__patient=patient, pregnancy__deleted=False, deleted=False,
+            done_on__isnull=True, resolution="",
+        )
+        .exclude(priority="optional")
+        .exists()
+    )
 
 
 def tag_patient(patient, facility) -> None:

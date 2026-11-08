@@ -5,12 +5,16 @@ import { Button } from "@/components/careui/button";
 import { Field, FieldLabel } from "@/components/careui/field";
 import { Input } from "@/components/careui/input";
 import { CHECK_KINDS } from "@/types";
+import type { Priority } from "@/types";
+
+import PriorityPicker from "./PriorityPicker";
 
 export interface NewCheck {
   label: string;
   kind: string;
   due_from: string;
   due_to: string;
+  priority: Priority;
 }
 
 /** A check for this patient only, for example a repeat scan the doctor wants. */
@@ -20,13 +24,14 @@ export default function AddCheck({ onAdd }: { onAdd: (check: NewCheck) => Promis
   const [kind, setKind] = useState("visit_check");
   const [dueFrom, setDueFrom] = useState("");
   const [dueTo, setDueTo] = useState("");
+  const [priority, setPriority] = useState<Priority>("medium");
   const [busy, setBusy] = useState(false);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
     try {
-      const ok = await onAdd({ label, kind, due_from: dueFrom, due_to: dueTo });
+      const ok = await onAdd({ label, kind, due_from: dueFrom, due_to: dueTo, priority });
       if (ok) {
         setLabel(""); setDueFrom(""); setDueTo(""); setOpen(false);
       }
@@ -59,6 +64,7 @@ export default function AddCheck({ onAdd }: { onAdd: (check: NewCheck) => Promis
           </Button>
         ))}
       </div>
+      <PriorityPicker value={priority} onChange={setPriority} />
       <div className="grid gap-3 sm:grid-cols-2">
         <Field>
           <FieldLabel htmlFor="add-check-from">Due from (optional)</FieldLabel>

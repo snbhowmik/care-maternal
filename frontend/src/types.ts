@@ -1,5 +1,19 @@
 export type ItemState = "done" | "elsewhere" | "waived" | "waiting" | "upcoming" | "due" | "overdue";
 export type Resolution = "" | "elsewhere" | "not_needed";
+export type Priority = "high" | "medium" | "low" | "optional";
+
+/** What each priority does. Mirrors the server rules in reminders.py. */
+export const PRIORITIES: { value: Priority; label: string; badge: "destructive" | "warning" | "neutral" | "info"; rule: string }[] = [
+  { value: "high", label: "High", badge: "destructive",
+    rule: "Everyone on duty and the patient are reminded 3 days early, up to 3 times a day, until it is recorded." },
+  { value: "medium", label: "Medium", badge: "warning",
+    rule: "Everyone on duty and the patient are reminded 1 day early, twice a day." },
+  { value: "low", label: "Low", badge: "neutral",
+    rule: "A single reminder on the due date. Never earlier, never repeated." },
+  { value: "optional", label: "Optional", badge: "info",
+    rule: "No reminders. The record is not mandatory, and it never keeps the patient on the worklist." },
+];
+export const priorityMeta = (p: string) => PRIORITIES.find((x) => x.value === p) ?? PRIORITIES[1];
 
 export interface Pregnancy {
   id: string;
@@ -30,6 +44,7 @@ export interface ScheduleItem {
   resolution: Resolution;
   resolution_note: string;
   resolved_on: string | null;
+  priority: Priority;
 }
 
 export interface ReferralEvent {
@@ -106,6 +121,7 @@ export interface CheckTemplate {
   relative_to: string;
   after_days: number | null;
   waiting_note: string;
+  priority: Priority;
   active: boolean;
   sort_order: number;
   source: "spec" | "custom";
@@ -123,3 +139,21 @@ export const CHECK_KINDS: { value: string; label: string }[] = [
 
 export const kindLabel = (kind: string): string =>
   CHECK_KINDS.find((k) => k.value === kind)?.label ?? kind.replace(/_/g, " ");
+
+export interface DutyState {
+  mine: boolean;
+  in_team: boolean;
+  hours: number;
+  roles: string[];
+  on_duty: { id: string; name: string }[];
+}
+
+export interface Reminder {
+  id: string;
+  message: string;
+  created: string;
+  acknowledged: boolean;
+  patient_id: string;
+  patient_name: string;
+  sms_sent: boolean;
+}

@@ -42,7 +42,7 @@ class ScheduleItemSerializer(serializers.ModelSerializer):
         fields = [
             "id", "spec_id", "kind", "label", "due_from", "due_to", "waiting_on",
             "done_on", "state", "appointment_id", "appointment_at",
-            "resolution", "resolution_note", "resolved_on",
+            "resolution", "resolution_note", "resolved_on", "priority",
         ]
         read_only_fields = fields
 

@@ -102,6 +102,8 @@ DEFAULTS = {
     "MATERNAL_EKA_CLIENT_ID": "",
     "MATERNAL_EKA_CLIENT_SECRET": "",
     "MATERNAL_EKA_API_BASE": "https://api.eka.care",
+    # Roles that receive check reminders while on duty (comma separated role names).
+    "MATERNAL_NOTIFY_ROLES": "Doctor,Nurse,ASHA Worker",
 }
 
 plugin_settings = PluginSettings(

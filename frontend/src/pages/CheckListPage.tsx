@@ -12,8 +12,10 @@ import { Label } from "@/components/careui/label";
 import { Skeleton } from "@/components/careui/skeleton";
 import { Switch } from "@/components/careui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/careui/table";
-import { CHECK_KINDS, kindLabel } from "@/types";
-import type { CheckTemplate } from "@/types";
+import { CHECK_KINDS, PRIORITIES, kindLabel, priorityMeta } from "@/types";
+import type { CheckTemplate, Priority } from "@/types";
+
+import PriorityPicker from "@/components/PriorityPicker";
 import { errorMessage, request } from "@/utils/api";
 
 type Mode = "age" | "after" | "manual";
@@ -57,13 +59,14 @@ function CheckForm({ initial, templates, saveLabel, onSave, onCancel }: {
   const [relativeTo, setRelativeTo] = useState(initial?.relative_to ?? "");
   const [afterDays, setAfterDays] = useState(String(initial?.after_days ?? ""));
   const [note, setNote] = useState(initial?.waiting_note ?? "");
+  const [priority, setPriority] = useState<Priority>(initial?.priority ?? "medium");
   const [busy, setBusy] = useState(false);
   const others = templates.filter((t) => t.id !== initial?.id && t.active);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
-    const payload: Partial<CheckTemplate> = { label, kind, waiting_note: mode === "manual" ? note : "" };
+    const payload: Partial<CheckTemplate> = { label, kind, priority, waiting_note: mode === "manual" ? note : "" };
     if (mode === "age") Object.assign(payload, { from_weeks: from, to_weeks: to, relative_to: "", after_days: null });
     if (mode === "after") Object.assign(payload, { from_weeks: "", to_weeks: to, relative_to: relativeTo, after_days: Number(afterDays) });
     if (mode === "manual") Object.assign(payload, { from_weeks: "", to_weeks: "", relative_to: "", after_days: null });
@@ -96,6 +99,7 @@ function CheckForm({ initial, templates, saveLabel, onSave, onCancel }: {
           {!CHECK_KINDS.some((k) => k.value === kind) && <Badge variant="neutral">{kindLabel(kind)}</Badge>}
         </div>
       </Field>
+      <PriorityPicker value={priority} onChange={setPriority} />
       <Field>
         <FieldLabel>When is it due?</FieldLabel>
         <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="When is it due">
@@ -224,6 +228,30 @@ export default function CheckListPage() {
         </Alert>
       )}
 
+      <Card>
+        <CardHeader>
+          <CardTitle>What priority does</CardTitle>
+          <CardDescription>
+            Priority decides who is reminded and how often. The people reminded are everyone on duty (doctors,
+            nurses and the other roles in the reminder list) and the patient.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ul className="flex flex-col gap-2 text-sm">
+            {PRIORITIES.map((p) => (
+              <li key={p.value} className="flex flex-wrap items-start gap-2">
+                <Badge variant={p.badge}>{p.label}</Badge>
+                <span className="min-w-0 flex-1 text-foreground">{p.rule}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Reminders go out between 08:00 and 20:00. A patient with a booked appointment for the check is not
+            reminded to come. These timings are defaults and still need clinician review.
+          </p>
+        </CardContent>
+      </Card>
+
       {canEdit && templates !== null && (
         <Card>
           <CardHeader>
@@ -264,6 +292,7 @@ export default function CheckListPage() {
                 <TableRow>
                   <TableHead>Check</TableHead>
                   <TableHead>Kind</TableHead>
+                  <TableHead>Priority</TableHead>
                   <TableHead>When</TableHead>
                   <TableHead>On</TableHead>
                   <TableHead><span className="sr-only">Edit</span></TableHead>
@@ -278,6 +307,7 @@ export default function CheckListPage() {
                         {t.source === "custom" && <Badge variant="info" className="ml-2">Added here</Badge>}
                       </TableCell>
                       <TableCell><Badge variant="neutral">{kindLabel(t.kind)}</Badge></TableCell>
+                      <TableCell><Badge variant={priorityMeta(t.priority).badge}>{priorityMeta(t.priority).label}</Badge></TableCell>
                       <TableCell className="whitespace-normal text-muted-foreground">{whenText(t, byId)}</TableCell>
                       <TableCell>
                         <Switch checked={t.active} disabled={!canEdit} aria-label={`${t.label}: create for new patients`}
@@ -296,7 +326,7 @@ export default function CheckListPage() {
                     </TableRow>
                     {editing === t.id && (
                       <TableRow>
-                        <TableCell colSpan={5} className="bg-soft-background">
+                        <TableCell colSpan={6} className="bg-soft-background">
                           <CheckForm initial={t} templates={templates ?? []} saveLabel="Save changes"
                             onCancel={() => setEditing(null)}
                             onSave={async (payload) => {

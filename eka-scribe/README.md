@@ -2,6 +2,19 @@
 
 > AI-powered clinical documentation (EkaScribe) plugin for the [CARE](https://github.com/ohcnetwork/care_fe) EMR.
 
+> **This is a modified copy of the upstream OHC plugin (MIT).** One change, in `src/hooks/useScribe.ts`: the Eka
+> access token is no longer built into the browser bundle (`REACT_EKA_ACCESS_TOKEN`). The scribe asks the
+> CARE backend for a short-lived token instead, from `GET /api/care_maternal/eka/token/` (the `care_maternal`
+> plugin), and asks again (`?renew=1`) when Eka answers 401. The Eka client ID and secret stay on the
+> server, the token lasts 30 minutes, and only logged-in staff get one. `REACT_EKA_ENV` still selects
+> `PROD` (the default here) or `DEV`. Nothing else is changed.
+>
+> Build for the demo hospitals, served at `/eka/` on the plugin host:
+> `REACT_EKA_ENV=PROD npx vite build --base /eka/ --outDir <care_maternal_fe>/dist/eka --emptyOutDir`, then add
+> `ohcnetwork/care_eka_scribe_fe@<plugin host>/eka/assets/remoteEntry.js` to `REACT_ENABLED_APPS`
+> (comma separated). Where it appears: on a questionnaire form inside an encounter (CARE's `Scribe` extension
+> point). A real recording needs a microphone and has not been tried from the build environment.
+
 `care_eka_scribe_fe` is a **Care Frontend plugin** that brings AI **Scribe** capabilities to OHCN's EMR. A clinician records a consultation, the audio is transcribed and structured by [Eka Care](https://www.eka.care/), and the extracted values are automatically matched and filled into CARE questionnaire forms — saving manual data entry and letting clinicians focus on the patient.
 
 It runs as a **Vite Module Federation remote** loaded by [`care_fe`](https://github.com/ohcnetwork/care_fe) and adds a floating microphone control that records, transcribes, and auto-fills forms.

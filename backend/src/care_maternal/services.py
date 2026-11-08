@@ -14,7 +14,7 @@ from care_maternal.models import (
     MaternalPregnancy,
     MaternalScheduleItem,
 )
-from care_maternal.utils.schedule import edd, ga_date, item_state, items_from_templates
+from care_maternal.utils.schedule import PRIORITIES, edd, ga_date, item_state, items_from_templates
 
 # Proposed wording from spec open question Q1. Not clinically approved. Demo only.
 EMERGENCY_PATIENT_TEXT = (
@@ -113,18 +113,21 @@ def reopen_item(item: MaternalScheduleItem) -> MaternalScheduleItem:
     return item
 
 
-def add_custom_item(pregnancy, label: str, kind: str, due_from, due_to, user) -> MaternalScheduleItem:
+def add_custom_item(pregnancy, label: str, kind: str, due_from, due_to, user, priority: str = "medium") -> MaternalScheduleItem:
     """A check added for this patient only, for example a repeat scan the doctor wants."""
     label = (label or "").strip()
     if not label:
         raise ValidationError({"label": "Write what the check is."})
     if due_from and due_to and due_to < due_from:
         raise ValidationError({"due_to": "The end date cannot be before the start date."})
+    if priority not in PRIORITIES:
+        raise ValidationError({"priority": "Choose high, medium, low or optional."})
     return MaternalScheduleItem.objects.create(
         pregnancy=pregnancy,
         spec_id=f"CUSTOM-{uuid.uuid4().hex[:8]}",
         kind=(kind or "visit_check").strip().lower().replace(" ", "_")[:32],
         label=label[:500],
+        priority=priority,
         due_from=due_from,
         due_to=due_to,
         waiting_on="" if due_from else "clinician sets the date",
@@ -149,7 +152,8 @@ def sweep_overdue(pregnancy, today: date | None = None) -> int:
     """Create one clinician alert per newly overdue item. Returns how many were raised."""
     today = today or timezone.localdate()
     raised = 0
-    for item in pregnancy.items.filter(done_on__isnull=True, resolution="", overdue_alerted=False):
+    open_items = pregnancy.items.filter(done_on__isnull=True, resolution="", overdue_alerted=False)
+    for item in open_items.exclude(priority="optional"):
         if item_state(item.due_from, item.due_to, None, today) == "overdue":
             raise_alert(
                 pregnancy,
